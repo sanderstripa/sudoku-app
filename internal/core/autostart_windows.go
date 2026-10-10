@@ -13,7 +13,7 @@ import (
 
 const (
 	windowsRunKeyPath       = `Software\Microsoft\Windows\CurrentVersion\Run`
-	windowsRunValueName     = "sudoku4x4"
+	windowsRunValueName     = "sudoku-app"
 	windowsAutostartArgLine = "--autostart"
 )
 
