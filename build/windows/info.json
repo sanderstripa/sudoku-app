@@ -1,0 +1,16 @@
+{
+	"fixed": {
+		"file_version": "0.1.0"
+	},
+	"info": {
+		"0409": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "sanderstripa",
+			"FileDescription": "Sudoku VPN",
+			"LegalCopyright": "(c) 2026, SUDOKU-ASCII",
+			"ProductName": "Sudoku VPN",
+			"Comments": "Sudoku desktop"
+		}
+	}
+}
+

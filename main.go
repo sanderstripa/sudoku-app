@@ -1,0 +1,256 @@
+package main
+
+import (
+	"embed"
+	"errors"
+	"fmt"
+	"os"
+	"runtime"
+	"strings"
+	"sync/atomic"
+	"time"
+
+	"github.com/SUDOKU-ASCII/sudoku-desktop/internal/core"
+	"github.com/SUDOKU-ASCII/sudoku/pkg/logx"
+	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
+)
+
+//go:embed all:frontend/dist
+var assets embed.FS
+
+//go:embed all:runtime/bin
+var bundledRuntime embed.FS
+
+//go:embed build/appicon.png
+var trayIcon []byte
+
+//go:embed build/tray/logo-monochrome.svg
+var trayTemplateIcon []byte
+
+func init() {
+	application.RegisterEvent[core.RuntimeState](core.EventStateUpdated)
+	application.RegisterEvent[core.LogEntry](core.EventLogAdded)
+}
+
+func main() {
+	startHidden := false
+	for _, arg := range os.Args[1:] {
+		switch strings.ToLower(strings.TrimSpace(arg)) {
+		case "--autostart", "--background", "--hidden":
+			startHidden = true
+		}
+	}
+
+	appService := NewApp(bundledRuntime, "runtime/bin")
+	var quitting atomic.Bool
+	var app *application.App
+	var mainWindow application.Window
+
+	showExistingInstance := func() {
+		application.InvokeAsync(func() {
+			if app != nil {
+				app.Show()
+			}
+			if mainWindow != nil {
+				if mainWindow.IsMinimised() {
+					mainWindow.UnMinimise()
+				}
+				mainWindow.Restore()
+				mainWindow.Show().Focus()
+			}
+			if app != nil {
+				dialog := app.Dialog.Info().
+					SetTitle("Sudoku уже запущен").
+					SetMessage("Переключились на открытое окно Sudoku.")
+				if mainWindow != nil {
+					dialog.AttachToWindow(mainWindow)
+				}
+				dialog.Show()
+			}
+		})
+	}
+
+	app = application.New(application.Options{
+		Name:        "sudoku-app",
+		Description: "Минималистичный VPN-клиент Sudoku",
+		Icon:        trayIcon,
+		Services: []application.Service{
+			application.NewService(appService),
+		},
+		Assets: application.AssetOptions{
+			Handler: application.BundledAssetFileServer(assets),
+		},
+		SingleInstance: &application.SingleInstanceOptions{
+			UniqueID: "com.sanderstripa.sudoku.vpn",
+			ExitCode: 0,
+			OnSecondInstanceLaunch: func(_ application.SecondInstanceData) {
+				showExistingInstance()
+			},
+		},
+		Windows: application.WindowsOptions{
+			DisableQuitOnLastWindowClosed: true,
+		},
+		Linux: application.LinuxOptions{
+			DisableQuitOnLastWindowClosed: true,
+			ProgramName:                   "sudoku-app",
+		},
+		Mac: application.MacOptions{
+			ApplicationShouldTerminateAfterLastWindowClosed: false,
+		},
+		ShouldQuit: func() bool {
+			quitting.Store(true)
+			appService.ShutdownNow()
+			return true
+		},
+	})
+
+	requestQuit := func() {
+		if !quitting.CompareAndSwap(false, true) {
+			return
+		}
+		appService.ShutdownNow()
+		app.Quit()
+	}
+
+	backgroundType, backgroundColour := mainWindowBackground()
+	mainWindow = app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name:                   "main",
+		Title:                  "Sudoku",
+		Width:                  410,
+		Height:                 660,
+		MinWidth:               360,
+		MinHeight:              580,
+		URL:                    "/",
+		Frameless:              true,
+		BackgroundType:         backgroundType,
+		BackgroundColour:       backgroundColour,
+		Hidden:                 startHidden,
+		OpenInspectorOnStartup: false,
+		Mac: application.MacWindow{
+			Backdrop: application.MacBackdropTransparent,
+		},
+		Windows: application.WindowsWindow{
+			DisableFramelessWindowDecorations: false,
+		},
+		Linux: application.LinuxWindow{
+			Icon:                trayIcon,
+			WindowIsTranslucent: true,
+		},
+		KeyBindings: map[string]func(window application.Window){
+			"cmd+q": func(window application.Window) {
+				requestQuit()
+			},
+			"ctrl+q": func(window application.Window) {
+				requestQuit()
+			},
+			"cmd+w": func(window application.Window) {
+				if runtime.GOOS == "darwin" {
+					window.Hide()
+				}
+			},
+			"ctrl+w": func(window application.Window) {
+				if runtime.GOOS == "darwin" {
+					window.Hide()
+				}
+			},
+		},
+	})
+
+	mainWindow.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
+		if quitting.Load() {
+			return
+		}
+		event.Cancel()
+		mainWindow.Hide()
+	})
+	configureApplicationMenu(app, mainWindow)
+
+	tray := app.SystemTray.New().
+		AttachWindow(mainWindow).
+		WindowDebounce(160 * time.Millisecond)
+	tray.SetTooltip("Sudoku")
+	if runtime.GOOS == "darwin" {
+		if len(trayTemplateIcon) > 0 {
+			tray.SetTemplateIcon(trayTemplateIcon)
+		} else if len(trayIcon) > 0 {
+			tray.SetTemplateIcon(trayIcon)
+		}
+	} else if len(trayIcon) > 0 {
+		tray.SetIcon(trayIcon)
+	}
+	tray.OnClick(func() {
+		mainWindow.Show().Focus()
+	})
+
+	trayMenu := application.NewMenu()
+	openItem := trayMenu.Add("Открыть Sudoku")
+	proxyToggleItem := trayMenu.Add("Подключить")
+	trayMenu.AddSeparator()
+	modeMenu := trayMenu.AddSubmenu("Маршрутизация")
+	modeGlobalItem := modeMenu.AddRadio("Весь трафик", false)
+	modeDirectItem := modeMenu.AddRadio("Напрямую", false)
+	modePACItem := modeMenu.AddRadio("PAC", false)
+	trayMenu.AddSeparator()
+	quitItem := trayMenu.Add("Выйти")
+
+	refreshTrayMenu := func() {
+		if appService.trayIsRunning() {
+			proxyToggleItem.SetLabel("Отключить")
+		} else {
+			proxyToggleItem.SetLabel("Подключить")
+		}
+		mode := appService.trayCurrentProxyMode()
+		modeGlobalItem.SetChecked(mode == "global")
+		modeDirectItem.SetChecked(mode == "direct")
+		modePACItem.SetChecked(mode == "pac")
+	}
+
+	openItem.OnClick(func(_ *application.Context) {
+		mainWindow.Show().Focus()
+	})
+	proxyToggleItem.OnClick(func(_ *application.Context) {
+		if err := appService.trayToggleProxy(); err != nil {
+			logx.Errorf("Desktop", "tray toggle proxy failed: %v", err)
+			if errors.Is(err, core.ErrAdminRequired) {
+				mainWindow.Show().Focus()
+			}
+		}
+		refreshTrayMenu()
+	})
+	modeGlobalItem.OnClick(func(_ *application.Context) {
+		if err := appService.traySetProxyMode("global"); err != nil {
+			logx.Errorf("Desktop", "tray set mode global failed: %v", err)
+		}
+		refreshTrayMenu()
+	})
+	modeDirectItem.OnClick(func(_ *application.Context) {
+		if err := appService.traySetProxyMode("direct"); err != nil {
+			logx.Errorf("Desktop", "tray set mode direct failed: %v", err)
+		}
+		refreshTrayMenu()
+	})
+	modePACItem.OnClick(func(_ *application.Context) {
+		if err := appService.traySetProxyMode("pac"); err != nil {
+			logx.Errorf("Desktop", "tray set mode pac failed: %v", err)
+		}
+		refreshTrayMenu()
+	})
+	quitItem.OnClick(func(_ *application.Context) {
+		requestQuit()
+	})
+
+	tray.SetMenu(trayMenu)
+	tray.OnRightClick(func() {
+		refreshTrayMenu()
+		tray.OpenMenu()
+	})
+	refreshTrayMenu()
+
+	err := app.Run()
+	if err != nil {
+		logx.Errorf("Desktop", "wails run failed: %v", err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
