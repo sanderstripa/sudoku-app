@@ -1,39 +1,55 @@
+<p align="center"><img src="build/appicon.png" width="112" height="112" alt="Sudoku VPN icon"></p>
+
 # Sudoku VPN
 
-Минималистичный клиент Sudoku для Windows 10/11 x64. Нативная оболочка Go + Wails / WebView2, интерфейс Vue, локальный шрифт Montserrat. Без Electron.
+A minimalist Sudoku VPN client for Windows 10/11 x64. Built with Go, Wails and Vue, with bundled Montserrat typography and light, dark and system themes.
 
-## Использование
+**[Download the Windows installer](https://github.com/sanderstripa/sudoku-app/releases/latest/download/Sudoku-Setup.exe)** · **[Releases](https://github.com/sanderstripa/sudoku-app/releases)**
 
-Откройте `Sudoku-Setup.exe`. Установщик использует Montserrat и цвета приложения: тумблер вверху переключает светлую и тёмную темы, кнопка RU/EN — весь интерфейс. Он устанавливает приложение в `Program Files\Sudoku`, добавляет ярлык в меню «Пуск» и, по выбору, на рабочем столе. Обновление сохраняет профиль. Удаление доступно в настройках приложений Windows; серверы и настройки в профиле сохраняются.
+## Features
 
-1. Откройте `Sudoku.exe`.
-2. Нажмите **Добавить соединение** и вставьте `sudoku://…` либо ссылку `http(s)://…/sub/….yaml` из [Sudoku UI](https://github.com/sanderstripa/sudoku-ui). Название необязательно.
-3. Нажмите **Подключить**. Подключение всегда использует VPN для всего устройства. В настройках выберите **Весь трафик через VPN** или **Все, кроме списка**.
-Интерфейс запускается с обычными правами. Windows автоматически запросит необходимые права для отдельной сетевой службы. Все функции доступны без ручного запуска через меню «От имени администратора». При обновлении режим системного прокси заменяется VPN для всего устройства. Список исключений сохраняется.
+- Device-wide VPN with a single connection button.
+- Domain-based split tunneling: route all traffic through VPN, or bypass VPN for listed domains and their subdomains.
+- Import Sudoku connections and subscriptions exported by [Sudoku UI](https://github.com/sanderstripa/sudoku-ui).
+- A themed tray menu for connections, profiles and settings.
+- Optional launch with Windows and automatic connection on startup.
+- A matching installer with light/dark themes and Russian/English switching.
 
-Крестик скрывает окно в трей; соединение продолжает работать. **Выйти** в меню трея отключает VPN и завершает приложение. Светлая, тёмная и системная темы доступны в настройках. Изменение темы сохраняется сразу; параметры подключения — кнопкой **Сохранить настройки**. Изменение VPN или маршрутизации при активном соединении применяется с автоматическим переподключением.
+## Getting started
 
-В разделе **Все, кроме списка** можно перечислить домены, которые будут работать напрямую, включая поддомены. Пример: `hh.ru`, `avito.ru`, `vk.ru` — каждый на отдельной строке. Произвольные приложения и IP-адреса в этом списке не поддерживаются.
+1. Download and run **Sudoku-Setup.exe**. It includes the application and installs it into `Program Files\Sudoku`.
+2. Open Sudoku, select **Add connection** and paste a `sudoku://` link or an HTTP(S) Sudoku subscription link.
+3. Click the circular power button to connect. Automatic connection is optional and disabled by default.
+4. To bypass selected websites, choose **All except the list** in Settings, enter one domain per line and save.
 
-Подписка из панели содержит один сервер Sudoku. Обновить её можно кнопкой со стрелками у сервера; повторный импорт той же подписки обновляет существующее соединение. Другие протоколы (VLESS, VMess, Trojan и др.) не поддерживаются. Ссылки и ключи сохраняются локально в `%APPDATA%\sudoku-app\config.json`; не публикуйте этот файл. При удалении сервер исчезает из приложения.
+The application currently uses Russian interface labels. The installer supports Russian and English.
 
-Для интерфейса нужен Microsoft Edge WebView2 Runtime (обычно уже установлен в Windows). Ядро Sudoku, HEV, Wintun и зависимости встроены в exe и извлекаются в профиль приложения при запуске. Автообновление ядра через интерфейс пока не реализовано: обновление приложения обновляет встроенное ядро. Управление WebRTC в браузерах не входит в desktop-клиент.
+The interface runs with normal user permissions. Windows requests elevation for a separate network helper; manual administrator launch is unnecessary. Microsoft Edge WebView2 Runtime is required.
 
-## Сборка
+Closing the window hides it in the tray and keeps the connection active. **Exit** in the tray disconnects VPN and closes the application. Saving connection settings during an active connection triggers a reconnect. Theme changes apply immediately.
 
-Требуются Windows x64, Go 1.26.4+, Node.js 24+, Git и доступ в интернет при сборке.
+## Split tunneling
+
+An entry such as `hh.ru` includes its subdomains, including `ekaterinburg.hh.ru`. Enter domains only, one per line. Application-based and arbitrary IP-based exclusions are not supported by this list.
+
+Websites may use additional domains for authentication, APIs or media. Excluding a main domain does not exclude unrelated domains automatically. Existing browser connections can retain their previous route until the browser is restarted. A website's own access restrictions can still prevent it from opening; an exclusion does not guarantee acceptance by that website.
+
+## Profiles and updates
+
+Connections and settings are stored locally in `%APPDATA%\sudoku-app\config.json`. It contains connection credentials; do not share it publicly. Reimporting the same subscription updates its existing connection. Updates and uninstalling preserve profile data.
+
+Only the Sudoku protocol is supported. VLESS, VMess and Trojan links are not supported. Sudoku, HEV and Wintun are bundled and extracted locally at startup. Updating the application updates the bundled core. In-app core updates and browser WebRTC controls are not implemented.
+
+## Build and verification
+
+Requirements: Windows x64, Go 1.26.4 or newer, Node.js 24 or newer, Git and internet access for dependencies.
 
 ```powershell
 ./scripts/build-windows.ps1
+./scripts/build-installer.ps1 -SkipApp
 ```
 
-Результат: `build/bin/Sudoku.exe`. Если ядро уже собрано: `./scripts/build-windows.ps1 -SkipCore`.
-
-Единый установщик со встроенным приложением: `./scripts/build-installer.ps1` (или `-SkipApp`, если приложение уже собрано). Результат — `build/bin/Sudoku-Setup.exe`. Установщик работает без загрузки приложения из интернета, использует WebView2, запрашивает права Windows и не запускает VPN при установке.
-
-В 0.1.3 исправлена потеря заранее прочитанных байтов TLS/WebSocket в HTTP-прокси ядра. Проверка регрессии запускается при сборке ядра. Это исправление транспортного уровня; отказ удалённого сервиса, проверка IP или ошибка сессии ChatGPT требуют отдельной диагностики и не устраняются изменением интерфейса.
-
-Сборка использует Sudoku `v0.5.1` с патчами исходного desktop-клиента и HEV `2.17.1`. Wails: `v3.0.0-alpha.74`, frontend runtime: `3.0.0-alpha.79`. Внешние зависимости закреплены в `go.sum` и `frontend/package-lock.json`. Manifest интерфейса использует обычные права; сетевая служба того же exe запускается через UAC и общается с интерфейсом по закрытому именованному каналу с проверкой токена. В Windows используется только TUN: системный прокси и WinHTTP не меняются. Автозапуск использует задачу Windows для текущего пользователя с обычными правами; пароль не сохраняется.
+Outputs: `build/bin/Sudoku.exe` and `build/bin/Sudoku-Setup.exe`. Use `-SkipCore` for an application build when the core has already been built.
 
 ```powershell
 go test ./internal/core
@@ -44,14 +60,12 @@ npm test
 npm run build
 ```
 
-GitHub Actions автоматически проверяет клиент и установщик и публикует оба exe в артефакте **Sudoku-Windows-x64**. Сборка не подписана сертификатом.
+GitHub Actions checks and builds the application and installer. Tagged releases publish both executables to GitHub Releases. Executables are not code-signed.
 
-## Основа и лицензии
+The build uses Sudoku `v0.5.1` with source patches, HEV `2.17.1`, Wails `v3.0.0-alpha.74` and frontend runtime `3.0.0-alpha.79`. Dependencies are recorded in `go.sum` and `frontend/package-lock.json`. Windows connections use TUN; the current client does not modify system proxy or WinHTTP settings.
 
-На основе [SUDOKU-ASCII/sudoku-desktop](https://github.com/SUDOKU-ASCII/sudoku-desktop), исходный commit `b11605f5b8a205fdeea845ffc3db052a4c7a9f7e`. Сохранены VPN backend, TUN-маршруты, восстановление системного прокси, обработка сбоев и тесты исходного проекта. Исходный Go module path сохранён для стабильности Wails bindings; целевой репозиторий приложения — `sanderstripa/sudoku-app`.
+## Credits and license
 
-Совместимость проверена по формату экспорта [sanderstripa/sudoku-ui](https://github.com/sanderstripa/sudoku-ui), commit `d7695238975da95451903197b3fec4c20e622859`. Визуальный стиль адаптирован по предоставленным скриншотам с шрифтом Montserrat по запросу.
+Based on [SUDOKU-ASCII/sudoku-desktop](https://github.com/SUDOKU-ASCII/sudoku-desktop), commit `b11605f5b8a205fdeea845ffc3db052a4c7a9f7e`. The original Go module path is retained for Wails bindings. Subscription compatibility follows [sanderstripa/sudoku-ui](https://github.com/sanderstripa/sudoku-ui), commit `d7695238975da95451903197b3fec4c20e622859`.
 
-Приложение распространяется под **GPL-3.0-or-later**: см. `LICENSE`. Montserrat — **SIL Open Font License**, см. `frontend/src/assets/fonts/Montserrat-OFL.txt`. Дополнительные компоненты сохраняют свои лицензии; см. `THIRD_PARTY.md`.
-
-Меню трея использует Montserrat и тему приложения. Оно закрывается при клике вне меню, клавишей Escape, крестиком или повторным нажатием значка. Print Screen и другие клавиши захвата не перехватываются приложением.
+Licensed under **GPL-3.0-or-later**; see [LICENSE](LICENSE). Montserrat uses the **SIL Open Font License**; see [Montserrat-OFL.txt](frontend/src/assets/fonts/Montserrat-OFL.txt). Component notices are listed in [THIRD_PARTY.md](THIRD_PARTY.md).
