@@ -1,5 +1,12 @@
 import { createApp } from 'vue'
 import './style.css'
+import { Window } from '@wailsio/runtime'
+
+window.addEventListener('keyup', (event) => {
+  if (event.key === 'Escape' && new URLSearchParams(location.search).has('tray')) {
+    void Window.Hide()
+  }
+})
 
 type AnyRecord = Record<string, any>
 const wailsRuntime = (window as unknown as AnyRecord).runtime as AnyRecord | undefined
@@ -43,7 +50,9 @@ const renderFatal = (err: unknown) => {
 window.addEventListener('error', (e) => renderFatal((e as ErrorEvent).error || (e as any).message))
 window.addEventListener('unhandledrejection', (e) => renderFatal((e as PromiseRejectionEvent).reason))
 
-import('./App.vue')
+const rootComponent = new URLSearchParams(location.search).has('tray')
+  ? import('./Tray.vue') : import('./App.vue')
+rootComponent
   .then(({ default: App }) => {
     wailsLogInfo('frontend: App.vue loaded')
     const app = createApp(App)

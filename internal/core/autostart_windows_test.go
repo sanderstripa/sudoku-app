@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-func TestElevatedAutostartUsesInteractiveUserAndQuotesExecutable(t *testing.T) {
+func TestAutostartUsesNormalInteractiveUserAndQuotesExecutable(t *testing.T) {
 	script := windowsAutostartScript(`C:\Users\O'Neil\My VPN\Sudoku.exe`, true)
-	for _, required := range []string{`-Execute 'C:\Users\O''Neil\My VPN\Sudoku.exe'`, `-LogonType Interactive -RunLevel Highest`, `-AtLogOn -User $identity.Name`, `$identity.User.Value`, `-ExecutionTimeLimit ([TimeSpan]::Zero)`, `-MultipleInstances IgnoreNew`} {
+	for _, required := range []string{`-Execute 'C:\Users\O''Neil\My VPN\Sudoku.exe'`, `-LogonType Interactive -RunLevel Limited`, `-AtLogOn -User $identity.Name`, `$identity.User.Value`, `-ExecutionTimeLimit ([TimeSpan]::Zero)`, `-MultipleInstances IgnoreNew`} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("missing %q", required)
 		}

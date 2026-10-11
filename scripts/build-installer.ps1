@@ -9,7 +9,7 @@ try {
  if(Test-Path -LiteralPath cmd/installer/wails_windows_amd64.syso){Remove-Item -LiteralPath cmd/installer/wails_windows_amd64.syso}
  & go test ./cmd/installer
  if($LASTEXITCODE -ne 0){throw 'Installer tests failed'}
- & go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.74 generate syso -arch amd64 -icon build/windows/icon.ico -manifest build/windows/wails.exe.manifest -info build/windows/info.json -out cmd/installer/wails_windows_amd64.syso
+ & go run github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.74 generate syso -arch amd64 -icon build/windows/icon.ico -manifest build/windows/installer.exe.manifest -info build/windows/info.json -out cmd/installer/wails_windows_amd64.syso
  if($LASTEXITCODE -ne 0){throw 'Installer resources failed'}
  $env:CGO_ENABLED='0'
  & go build -tags production -trimpath -buildvcs=false '-ldflags=-w -s -H windowsgui' -o build/bin/Sudoku-Setup.exe ./cmd/installer

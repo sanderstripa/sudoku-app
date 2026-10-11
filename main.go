@@ -2,13 +2,11 @@ package main
 
 import (
 	"embed"
-	"errors"
 	"fmt"
 	"os"
 	"runtime"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/SUDOKU-ASCII/sudoku-desktop/internal/core"
 	"github.com/SUDOKU-ASCII/sudoku/pkg/logx"
@@ -34,6 +32,9 @@ func init() {
 }
 
 func main() {
+	if runNetworkHelper() {
+		return
+	}
 	startHidden := false
 	for _, arg := range os.Args[1:] {
 		switch strings.ToLower(strings.TrimSpace(arg)) {
@@ -166,87 +167,47 @@ func main() {
 	})
 	configureApplicationMenu(app, mainWindow)
 
-	tray := app.SystemTray.New().
-		AttachWindow(mainWindow).
-		WindowDebounce(160 * time.Millisecond)
+	trayWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Name: "tray-menu", Title: "Sudoku — меню", Width: 250, Height: 255,
+		URL: "/?tray=1", Frameless: true, Hidden: true, AlwaysOnTop: true,
+		ContentProtectionEnabled: false, BackgroundColour: backgroundColour,
+		Windows: application.WindowsWindow{DisableFramelessWindowDecorations: false},
+	})
+	trayWindow.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
+		event.Cancel()
+		trayWindow.Hide()
+	})
+	// Keep the popup visible when screen clipping takes focus. Escape,
+	// selecting an action, or clicking the tray icon again closes it.
+	tray := app.SystemTray.New()
 	tray.SetTooltip("Sudoku")
 	if runtime.GOOS == "darwin" {
-		if len(trayTemplateIcon) > 0 {
-			tray.SetTemplateIcon(trayTemplateIcon)
-		} else if len(trayIcon) > 0 {
-			tray.SetTemplateIcon(trayIcon)
-		}
-	} else if len(trayIcon) > 0 {
+		tray.SetTemplateIcon(trayTemplateIcon)
+	} else {
 		tray.SetIcon(trayIcon)
 	}
-	tray.OnClick(func() {
-		mainWindow.Show().Focus()
-	})
-
-	trayMenu := application.NewMenu()
-	openItem := trayMenu.Add("Открыть Sudoku")
-	proxyToggleItem := trayMenu.Add("Подключить")
-	trayMenu.AddSeparator()
-	modeMenu := trayMenu.AddSubmenu("Маршрутизация")
-	modeGlobalItem := modeMenu.AddRadio("Весь трафик", false)
-	modeDirectItem := modeMenu.AddRadio("Напрямую", false)
-	modePACItem := modeMenu.AddRadio("PAC", false)
-	trayMenu.AddSeparator()
-	quitItem := trayMenu.Add("Выйти")
-
-	refreshTrayMenu := func() {
-		if appService.trayIsRunning() {
-			proxyToggleItem.SetLabel("Отключить")
-		} else {
-			proxyToggleItem.SetLabel("Подключить")
+	showTray := func() {
+		if trayWindow.IsVisible() {
+			trayWindow.Hide()
+			return
 		}
-		mode := appService.trayCurrentProxyMode()
-		modeGlobalItem.SetChecked(mode == "global")
-		modeDirectItem.SetChecked(mode == "direct")
-		modePACItem.SetChecked(mode == "pac")
+		_ = tray.PositionWindow(trayWindow, 8)
+		trayWindow.Show().Focus()
 	}
-
-	openItem.OnClick(func(_ *application.Context) {
-		mainWindow.Show().Focus()
-	})
-	proxyToggleItem.OnClick(func(_ *application.Context) {
-		if err := appService.trayToggleProxy(); err != nil {
-			logx.Errorf("Desktop", "tray toggle proxy failed: %v", err)
-			if errors.Is(err, core.ErrAdminRequired) {
-				mainWindow.Show().Focus()
-			}
+	tray.OnClick(showTray)
+	tray.OnRightClick(showTray)
+	app.Event.On("tray:open", func(event *application.CustomEvent) {
+		page, _ := event.Data.(string)
+		if page != "settings" && page != "servers" {
+			page = "home"
 		}
-		refreshTrayMenu()
+		application.InvokeAsync(func() {
+			trayWindow.Hide()
+			mainWindow.Show().Focus()
+			app.Event.Emit("main:navigate", page)
+		})
 	})
-	modeGlobalItem.OnClick(func(_ *application.Context) {
-		if err := appService.traySetProxyMode("global"); err != nil {
-			logx.Errorf("Desktop", "tray set mode global failed: %v", err)
-		}
-		refreshTrayMenu()
-	})
-	modeDirectItem.OnClick(func(_ *application.Context) {
-		if err := appService.traySetProxyMode("direct"); err != nil {
-			logx.Errorf("Desktop", "tray set mode direct failed: %v", err)
-		}
-		refreshTrayMenu()
-	})
-	modePACItem.OnClick(func(_ *application.Context) {
-		if err := appService.traySetProxyMode("pac"); err != nil {
-			logx.Errorf("Desktop", "tray set mode pac failed: %v", err)
-		}
-		refreshTrayMenu()
-	})
-	quitItem.OnClick(func(_ *application.Context) {
-		requestQuit()
-	})
-
-	tray.SetMenu(trayMenu)
-	tray.OnRightClick(func() {
-		refreshTrayMenu()
-		tray.OpenMenu()
-	})
-	refreshTrayMenu()
-
+	app.Event.On("tray:quit", func(_ *application.CustomEvent) { go requestQuit() })
 	err := app.Run()
 	if err != nil {
 		logx.Errorf("Desktop", "wails run failed: %v", err)

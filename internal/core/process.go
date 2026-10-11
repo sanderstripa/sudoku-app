@@ -13,12 +13,13 @@ import (
 )
 
 type ManagedProcess struct {
-	mu      sync.RWMutex
-	name    string
-	cmd     *exec.Cmd
-	cancel  context.CancelFunc
-	running bool
-	done    chan error
+	mu       sync.RWMutex
+	name     string
+	cmd      *exec.Cmd
+	cancel   context.CancelFunc
+	running  bool
+	done     chan error
+	stopping bool
 }
 
 func NewManagedProcess(name string) *ManagedProcess {
@@ -55,6 +56,7 @@ func (p *ManagedProcess) Start(command string, args []string, env []string, work
 	p.cmd = cmd
 	p.cancel = cancel
 	p.running = true
+	p.stopping = false
 	p.done = make(chan error, 1)
 	localDone := p.done
 
@@ -66,16 +68,22 @@ func (p *ManagedProcess) Start(command string, args []string, env []string, work
 	}()
 	go func() {
 		err := cmd.Wait()
-		localDone <- err
-		close(localDone)
 		p.mu.Lock()
-		defer p.mu.Unlock()
+		intentional := p.stopping
 		if p.cancel != nil {
 			p.cancel()
 		}
 		p.cancel = nil
 		p.cmd = nil
 		p.running = false
+		p.mu.Unlock()
+		if intentional {
+			err = nil
+		}
+		localDone <- err
+		close(localDone)
+		// Callbacks may acquire Backend.mu, whose readers also inspect this
+		// process. Never invoke them while holding the process lock.
 		if err != nil && onLine != nil {
 			onLine(fmt.Sprintf("%s exited: %v", p.name, err))
 		}
@@ -93,6 +101,7 @@ func (p *ManagedProcess) Stop(timeout time.Duration) error {
 	cmd := p.cmd
 	cancel := p.cancel
 	done := p.done
+	p.stopping = true
 	p.mu.Unlock()
 
 	if cmd.Process != nil {

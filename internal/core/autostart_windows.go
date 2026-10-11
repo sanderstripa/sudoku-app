@@ -48,8 +48,8 @@ func setLaunchAtLogin(enabled bool) error {
 	return err
 }
 
-// InteractiveToken + Highest runs in the user's desktop session, without storing
-// a password. HKCU Run entries cannot reliably launch a requireAdministrator exe.
+// The desktop UI must run at normal integrity, including when launched at login.
+// Only its network helper requests elevation.
 func windowsAutostartScript(exe string, enabled bool) string {
 	lines := []string{
 		"$ErrorActionPreference = 'Stop'",
@@ -63,7 +63,7 @@ func windowsAutostartScript(exe string, enabled bool) string {
 	return strings.Join(append(lines,
 		"$action = New-ScheduledTaskAction -Execute '"+strings.ReplaceAll(exe, "'", "''")+"' -Argument '"+windowsAutostartArgLine+"'",
 		"$trigger = New-ScheduledTaskTrigger -AtLogOn -User $identity.Name",
-		"$principal = New-ScheduledTaskPrincipal -UserId $identity.Name -LogonType Interactive -RunLevel Highest",
+		"$principal = New-ScheduledTaskPrincipal -UserId $identity.Name -LogonType Interactive -RunLevel Limited",
 		"$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew",
 		"Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null"), "\n")
 }

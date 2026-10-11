@@ -758,13 +758,16 @@ func (b *Backend) StartProxy(req StartRequest) error {
 				return fmt.Errorf("core socks not ready: %w", err)
 			}
 			proxyMode := strings.ToLower(strings.TrimSpace(routingCfg.ProxyMode))
-			if proxyMode == "global" || proxyMode == "pac" {
+			if runtime.GOOS != "windows" && (proxyMode == "global" || proxyMode == "pac") {
 				// 1) Verify SOCKS can CONNECT to an external IP (tests proxy path without DNS).
 				if err := healthCheckSOCKS5Connect(hctx, socksAddr, "1.1.1.1:443", 3*time.Second); err != nil {
 					return fmt.Errorf("socks proxy-path check failed: %w", err)
 				}
 			}
-			if proxyMode == "direct" || proxyMode == "pac" {
+			// Windows already verified upstream before changing routes. These
+			// fixed Chinese IPs do not represent a user's domain exceptions and
+			// can be blocked independently of the actual connection.
+			if runtime.GOOS != "windows" && (proxyMode == "direct" || proxyMode == "pac") {
 				// 1.2) Verify a "domestic direct" path is usable. This catches PAC+TUN loop issues where
 				// many DIRECT flows become unreachable while PROXY still works.
 				if err := healthCheckSOCKS5ConnectAny(hctx, socksAddr, []string{"223.5.5.5:443", "119.29.29.29:443"}, 3*time.Second); err != nil {
@@ -1123,6 +1126,9 @@ func (b *Backend) StopProxy() error {
 		b.state.LastError = err.Error()
 		b.emitStateLocked()
 		b.mu.Unlock()
+		if b.tunRunningLocked() {
+			return err
+		}
 	}
 	_ = b.coreProc.Stop(3 * time.Second)
 	b.pfMgr.StopAll()
@@ -1140,6 +1146,7 @@ func (b *Backend) StopProxy() error {
 	b.runningTunInterface = ""
 	b.state.NeedsAdmin = false
 	b.state.RouteSetupError = ""
+	b.state.LastError = ""
 	b.emitStateLocked()
 	b.mu.Unlock()
 	return nil

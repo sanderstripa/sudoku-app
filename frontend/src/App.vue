@@ -7,7 +7,7 @@ import {
   watch,
   nextTick,
 } from "vue";
-import { Window } from "@wailsio/runtime";
+import { Window, Events } from "@wailsio/runtime";
 import {
   Power,
   Settings2,
@@ -38,6 +38,11 @@ const draft = ref<AppConfig>();
 const config = ref<AppConfig>(),
   state = ref<RuntimeState>();
 const page = ref<"home" | "settings" | "servers" | "logs">("home");
+const removeNavigation = Events.On("main:navigate", async (event) => {
+  await reload();
+  if (event.data === "settings") openSettings();
+  else page.value = event.data === "servers" ? "servers" : "home";
+});
 const importing = ref(false),
   link = ref(""),
   name = ref(""),
@@ -268,6 +273,7 @@ onMounted(async () => {
   }, 1500);
 });
 onBeforeUnmount(() => {
+  removeNavigation();
   clearInterval(timer);
   media.removeEventListener("change", applyTheme);
 });

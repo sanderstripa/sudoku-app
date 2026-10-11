@@ -18,6 +18,7 @@ import (
 // App struct
 type App struct {
 	backend      *core.Backend
+	remote       *networkClient
 	shutdownOnce sync.Once
 
 	runtimeFS   fs.FS
@@ -26,6 +27,9 @@ type App struct {
 
 // NewApp creates a new App application struct
 func NewApp(runtimeFS fs.FS, runtimeRoot string) *App {
+	if needsNetworkHelper() {
+		return &App{runtimeFS: runtimeFS, runtimeRoot: runtimeRoot}
+	}
 	backend, _ := core.NewBackendWithRuntimeFS(runtimeFS, runtimeRoot)
 	return &App{
 		backend:     backend,
@@ -35,6 +39,11 @@ func NewApp(runtimeFS fs.FS, runtimeRoot string) *App {
 }
 
 func (a *App) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
+	if needsNetworkHelper() {
+		var err error
+		a.remote, err = startNetworkHelper()
+		return err
+	}
 	if a.backend == nil {
 		b, err := core.NewBackendWithRuntimeFS(a.runtimeFS, a.runtimeRoot)
 		if err != nil {
@@ -61,6 +70,11 @@ func (a *App) ServiceShutdown() error {
 
 func (a *App) shutdownBackend() {
 	a.shutdownOnce.Do(func() {
+		if a.remote != nil {
+			_ = a.remote.call("Shutdown", nil, nil)
+			_ = a.remote.client.Close()
+			return
+		}
 		if a.backend != nil {
 			a.backend.Shutdown()
 		}
@@ -106,6 +120,15 @@ func (a *App) trayCurrentProxyMode() string {
 }
 
 func (a *App) GetConfig() core.AppConfig {
+	if a.remote != nil {
+		var result core.AppConfig
+		err := a.remote.call("GetConfig", []any{}, &result)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return result
+	}
+
 	if a.backend == nil {
 		return core.AppConfig{}
 	}
@@ -113,6 +136,10 @@ func (a *App) GetConfig() core.AppConfig {
 }
 
 func (a *App) SaveConfig(cfg core.AppConfig) error {
+	if a.remote != nil {
+		return a.remote.call("SaveConfig", []any{cfg}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -120,6 +147,10 @@ func (a *App) SaveConfig(cfg core.AppConfig) error {
 }
 
 func (a *App) SetRoutingMode(mode string) error {
+	if a.remote != nil {
+		return a.remote.call("SetRoutingMode", []any{mode}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -127,6 +158,15 @@ func (a *App) SetRoutingMode(mode string) error {
 }
 
 func (a *App) GetState() core.RuntimeState {
+	if a.remote != nil {
+		var result core.RuntimeState
+		err := a.remote.call("GetState", []any{}, &result)
+		if err != nil {
+			result.LastError = err.Error()
+		}
+		return result
+	}
+
 	if a.backend == nil {
 		return core.RuntimeState{}
 	}
@@ -134,6 +174,10 @@ func (a *App) GetState() core.RuntimeState {
 }
 
 func (a *App) StartProxy(req core.StartRequest) error {
+	if a.remote != nil {
+		return a.remote.call("StartProxy", []any{req}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -141,6 +185,10 @@ func (a *App) StartProxy(req core.StartRequest) error {
 }
 
 func (a *App) StopProxy() error {
+	if a.remote != nil {
+		return a.remote.call("StopProxy", []any{}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -148,6 +196,10 @@ func (a *App) StopProxy() error {
 }
 
 func (a *App) RestartProxy(req core.StartRequest) error {
+	if a.remote != nil {
+		return a.remote.call("RestartProxy", []any{req}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -155,6 +207,12 @@ func (a *App) RestartProxy(req core.StartRequest) error {
 }
 
 func (a *App) UpsertNode(node core.NodeConfig) (core.NodeConfig, error) {
+	if a.remote != nil {
+		var result core.NodeConfig
+		err := a.remote.call("UpsertNode", []any{node}, &result)
+		return result, err
+	}
+
 	if a.backend == nil {
 		return core.NodeConfig{}, nil
 	}
@@ -162,6 +220,10 @@ func (a *App) UpsertNode(node core.NodeConfig) (core.NodeConfig, error) {
 }
 
 func (a *App) DeleteNode(nodeID string) error {
+	if a.remote != nil {
+		return a.remote.call("DeleteNode", []any{nodeID}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -169,6 +231,10 @@ func (a *App) DeleteNode(nodeID string) error {
 }
 
 func (a *App) SetActiveNode(nodeID string) error {
+	if a.remote != nil {
+		return a.remote.call("SetActiveNode", []any{nodeID}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -176,6 +242,10 @@ func (a *App) SetActiveNode(nodeID string) error {
 }
 
 func (a *App) SwitchNode(nodeID string) error {
+	if a.remote != nil {
+		return a.remote.call("SwitchNode", []any{nodeID}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -183,6 +253,12 @@ func (a *App) SwitchNode(nodeID string) error {
 }
 
 func (a *App) ImportShortLink(name string, link string) (core.NodeConfig, error) {
+	if a.remote != nil {
+		var result core.NodeConfig
+		err := a.remote.call("ImportShortLink", []any{name, link}, &result)
+		return result, err
+	}
+
 	if a.backend == nil {
 		return core.NodeConfig{}, nil
 	}
@@ -190,6 +266,12 @@ func (a *App) ImportShortLink(name string, link string) (core.NodeConfig, error)
 }
 
 func (a *App) ExportShortLink(nodeID string) (string, error) {
+	if a.remote != nil {
+		var result string
+		err := a.remote.call("ExportShortLink", []any{nodeID}, &result)
+		return result, err
+	}
+
 	if a.backend == nil {
 		return "", nil
 	}
@@ -197,6 +279,12 @@ func (a *App) ExportShortLink(nodeID string) (string, error) {
 }
 
 func (a *App) ProbeNode(nodeID string) (core.LatencyResult, error) {
+	if a.remote != nil {
+		var result core.LatencyResult
+		err := a.remote.call("ProbeNode", []any{nodeID}, &result)
+		return result, err
+	}
+
 	if a.backend == nil {
 		return core.LatencyResult{}, nil
 	}
@@ -204,6 +292,15 @@ func (a *App) ProbeNode(nodeID string) (core.LatencyResult, error) {
 }
 
 func (a *App) ProbeAllNodes() []core.LatencyResult {
+	if a.remote != nil {
+		var result []core.LatencyResult
+		err := a.remote.call("ProbeAllNodes", []any{}, &result)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return result
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -211,6 +308,12 @@ func (a *App) ProbeAllNodes() []core.LatencyResult {
 }
 
 func (a *App) AutoSelectLowestLatency() (core.LatencyResult, error) {
+	if a.remote != nil {
+		var result core.LatencyResult
+		err := a.remote.call("AutoSelectLowestLatency", []any{}, &result)
+		return result, err
+	}
+
 	if a.backend == nil {
 		return core.LatencyResult{}, nil
 	}
@@ -218,6 +321,10 @@ func (a *App) AutoSelectLowestLatency() (core.LatencyResult, error) {
 }
 
 func (a *App) SortNodesByName() error {
+	if a.remote != nil {
+		return a.remote.call("SortNodesByName", []any{}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -225,6 +332,10 @@ func (a *App) SortNodesByName() error {
 }
 
 func (a *App) SortNodesByLatency() error {
+	if a.remote != nil {
+		return a.remote.call("SortNodesByLatency", []any{}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -232,6 +343,15 @@ func (a *App) SortNodesByLatency() error {
 }
 
 func (a *App) DetectIPDirect() core.IPDetectResult {
+	if a.remote != nil {
+		var result core.IPDetectResult
+		err := a.remote.call("DetectIPDirect", []any{}, &result)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return result
+	}
+
 	if a.backend == nil {
 		return core.IPDetectResult{}
 	}
@@ -239,6 +359,15 @@ func (a *App) DetectIPDirect() core.IPDetectResult {
 }
 
 func (a *App) DetectIPProxy() core.IPDetectResult {
+	if a.remote != nil {
+		var result core.IPDetectResult
+		err := a.remote.call("DetectIPProxy", []any{}, &result)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return result
+	}
+
 	if a.backend == nil {
 		return core.IPDetectResult{}
 	}
@@ -246,6 +375,15 @@ func (a *App) DetectIPProxy() core.IPDetectResult {
 }
 
 func (a *App) GetLANProxyInfo() core.LANProxyInfo {
+	if a.remote != nil {
+		var result core.LANProxyInfo
+		err := a.remote.call("GetLANProxyInfo", []any{}, &result)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return result
+	}
+
 	if a.backend == nil {
 		return core.LANProxyInfo{}
 	}
@@ -253,6 +391,10 @@ func (a *App) GetLANProxyInfo() core.LANProxyInfo {
 }
 
 func (a *App) StartReverseForwarder() error {
+	if a.remote != nil {
+		return a.remote.call("StartReverseForwarder", []any{}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -260,6 +402,10 @@ func (a *App) StartReverseForwarder() error {
 }
 
 func (a *App) StopReverseForwarder() error {
+	if a.remote != nil {
+		return a.remote.call("StopReverseForwarder", []any{}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -267,6 +413,15 @@ func (a *App) StopReverseForwarder() error {
 }
 
 func (a *App) GetLogs(level string, limit int) []core.LogEntry {
+	if a.remote != nil {
+		var result []core.LogEntry
+		err := a.remote.call("GetLogs", []any{level, limit}, &result)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return result
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -274,6 +429,12 @@ func (a *App) GetLogs(level string, limit int) []core.LogEntry {
 }
 
 func (a *App) ExportLogs(entries []core.LogEntry) (string, error) {
+	if a.remote != nil {
+		var result string
+		err := a.remote.call("ExportLogs", []any{entries}, &result)
+		return result, err
+	}
+
 	app := application.Get()
 	if app == nil {
 		return "", fmt.Errorf("application is not ready")
@@ -330,6 +491,15 @@ func firstNonEmpty(values ...string) string {
 }
 
 func (a *App) GetConnections() []core.ActiveConnection {
+	if a.remote != nil {
+		var result []core.ActiveConnection
+		err := a.remote.call("GetConnections", []any{}, &result)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return result
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -337,6 +507,10 @@ func (a *App) GetConnections() []core.ActiveConnection {
 }
 
 func (a *App) CloseConnection(connectionID string) error {
+	if a.remote != nil {
+		return a.remote.call("CloseConnection", []any{connectionID}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -344,6 +518,10 @@ func (a *App) CloseConnection(connectionID string) error {
 }
 
 func (a *App) CloseAllConnections() error {
+	if a.remote != nil {
+		return a.remote.call("CloseAllConnections", []any{}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -351,6 +529,15 @@ func (a *App) CloseAllConnections() error {
 }
 
 func (a *App) GetUsageHistory(limit int) []core.UsageDay {
+	if a.remote != nil {
+		var result []core.UsageDay
+		err := a.remote.call("GetUsageHistory", []any{limit}, &result)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return result
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -358,6 +545,10 @@ func (a *App) GetUsageHistory(limit int) []core.UsageDay {
 }
 
 func (a *App) EnsureCoreBinaries() error {
+	if a.remote != nil {
+		return a.remote.call("EnsureCoreBinaries", []any{}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -365,6 +556,15 @@ func (a *App) EnsureCoreBinaries() error {
 }
 
 func (a *App) BuildInfo() map[string]string {
+	if a.remote != nil {
+		var result map[string]string
+		err := a.remote.call("BuildInfo", []any{}, &result)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return result
+	}
+
 	if a.backend == nil {
 		return map[string]string{}
 	}
@@ -372,6 +572,10 @@ func (a *App) BuildInfo() map[string]string {
 }
 
 func (a *App) ValidateYAML(content string) error {
+	if a.remote != nil {
+		return a.remote.call("ValidateYAML", []any{content}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -379,6 +583,15 @@ func (a *App) ValidateYAML(content string) error {
 }
 
 func (a *App) OpenRuntimeDir() string {
+	if a.remote != nil {
+		var result string
+		err := a.remote.call("OpenRuntimeDir", []any{}, &result)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return result
+	}
+
 	if a.backend == nil {
 		return ""
 	}
@@ -386,6 +599,15 @@ func (a *App) OpenRuntimeDir() string {
 }
 
 func (a *App) OpenConfigPath() string {
+	if a.remote != nil {
+		var result string
+		err := a.remote.call("OpenConfigPath", []any{}, &result)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return result
+	}
+
 	if a.backend == nil {
 		return ""
 	}
@@ -395,6 +617,15 @@ func (a *App) OpenConfigPath() string {
 // TunHasPrivileges reports whether the app can perform privileged TUN operations
 // silently on the current platform (supported on macOS/Linux via in-app sudo caching).
 func (a *App) TunHasPrivileges() bool {
+	if a.remote != nil {
+		var result bool
+		err := a.remote.call("TunHasPrivileges", []any{}, &result)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		return result
+	}
+
 	if a.backend == nil {
 		return false
 	}
@@ -404,6 +635,10 @@ func (a *App) TunHasPrivileges() bool {
 // TunAcquirePrivileges validates and caches the system password for sudo-backed TUN
 // operations. The password is stored in-memory only and never written to disk.
 func (a *App) TunAcquirePrivileges(password string) error {
+	if a.remote != nil {
+		return a.remote.call("TunAcquirePrivileges", []any{password}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}
@@ -412,6 +647,10 @@ func (a *App) TunAcquirePrivileges(password string) error {
 
 // TunDropPrivileges clears any cached admin credentials used for TUN operations.
 func (a *App) TunDropPrivileges() error {
+	if a.remote != nil {
+		return a.remote.call("TunDropPrivileges", []any{}, nil)
+	}
+
 	if a.backend == nil {
 		return nil
 	}

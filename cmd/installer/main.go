@@ -30,7 +30,7 @@ var payload []byte
 //go:embed web/assets/icon.png
 var icon []byte
 
-const version = "0.1.4"
+const version = "0.1.5"
 const uninstallKey = `Software\Microsoft\Windows\CurrentVersion\Uninstall\SudokuApp`
 
 type setup struct {
@@ -180,7 +180,9 @@ func (s *setup) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.removed = err == nil
 		}
 	case "/api/open":
-		cmd := exec.Command(filepath.Join(installDir(), "Sudoku.exe"))
+		// Explorer launches the desktop interface at the user's normal integrity
+		// instead of inheriting the installer's administrator token.
+		cmd := exec.Command("explorer.exe", filepath.Join(installDir(), "Sudoku.exe"))
 		err = cmd.Start()
 	case "/api/close":
 		go s.app.Quit()
