@@ -190,6 +190,9 @@ test("import, connection state, settings drafts, routing and themes", async ({
       path: path.join(process.env.SUDOKU_PREVIEW_DIR, "settings-light.png"),
     });
   }
+  if (await page.getByRole("combobox", { name: "Режим" }).count() === 0) {
+    await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  }
   for (const theme of ["Тёмная", "Светлая"]) {
     await page.getByRole("button", { name: theme, exact: true }).click();
     await page.getByRole("combobox", { name: "Режим" }).click();
