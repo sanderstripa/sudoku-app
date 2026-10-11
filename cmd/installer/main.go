@@ -30,7 +30,7 @@ var payload []byte
 //go:embed web/assets/icon.png
 var icon []byte
 
-const version = "0.1.7"
+const version = "0.1.8"
 const uninstallKey = `Software\Microsoft\Windows\CurrentVersion\Uninstall\SudokuApp`
 
 type setup struct {

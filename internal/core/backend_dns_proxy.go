@@ -33,6 +33,12 @@ func (b *Backend) prepareTunDNSRuntime(ctx context.Context, cfg *AppConfig, loca
 		healthAddr:       upstreamAddr,
 		upstreamAddr:     upstreamAddr,
 	}
+	// Explicit domain exceptions must reach SOCKS as domain names. HEV MapDNS
+	// preserves that association. Returning real addresses from split DNS
+	// discards the name, so domain-only rules cannot match and default to VPN.
+	if runtime.GOOS == "windows" && cfg.Routing.CustomRulesEnabled {
+		return out, nil
+	}
 
 	if strings.ToLower(strings.TrimSpace(cfg.Routing.ProxyMode)) != "pac" {
 		return out, nil
