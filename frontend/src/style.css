@@ -441,7 +441,7 @@ textarea {
   min-height: 66px;
   max-height: 200px;
 }
-input:disabled,
+input:not([type="checkbox"]):disabled,
 select:disabled,
 textarea:disabled {
   opacity: 0.55;

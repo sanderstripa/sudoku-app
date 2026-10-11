@@ -168,7 +168,7 @@ function openSettings() {
 }
 async function saveSettings() {
   await action(async () => {
-    if (!draft.value || running.value) return;
+    if (!draft.value) return;
     const clean = [
       ...new Set(
         domains.value
@@ -199,8 +199,29 @@ async function saveSettings() {
     c.routing.customRules = clean
       .map((s) => "DOMAIN-SUFFIX," + s + ",DIRECT")
       .join("\n");
-    await api.saveConfig(c);
-    await reload();
+    const reconnect =
+      running.value &&
+      (c.tun.enabled !== config.value?.tun.enabled ||
+        JSON.stringify(c.routing) !== JSON.stringify(config.value?.routing));
+    if (reconnect) await api.stopProxy();
+    try {
+      await api.saveConfig(c);
+    } catch (e) {
+      if (reconnect) {
+        try {
+          await api.startProxy({ withTun: !!config.value?.tun.enabled });
+        } catch {
+          /* The original save error is shown; reload preserves current state. */
+        }
+      }
+      throw e;
+    } finally {
+      await reload();
+    }
+    if (reconnect) {
+      await api.startProxy({ withTun: !!c.tun.enabled });
+      await reload();
+    }
     message.value = "Настройки сохранены";
     page.value = "home";
   });
@@ -376,7 +397,7 @@ onBeforeUnmount(() => {
           </section>
           <section class="settings-section">
             <h2><Link2 :size="17" />ПОДКЛЮЧЕНИЕ</h2>
-            <fieldset :disabled="busy || running">
+            <fieldset :disabled="busy">
               <label class="toggle-row"
                 >VPN для всего устройства<input
                   v-model="draft.tun.enabled"
@@ -398,7 +419,7 @@ onBeforeUnmount(() => {
           </section>
           <section class="settings-section">
             <h2><GitBranch :size="17" />РАЗДЕЛЬНОЕ ТУННЕЛИРОВАНИЕ</h2>
-            <fieldset :disabled="busy || running">
+            <fieldset :disabled="busy">
               <label class="field-label" for="routing">Режим</label
               ><select id="routing" v-model="split">
                 <option :value="false">Весь трафик через VPN</option>
@@ -416,13 +437,9 @@ onBeforeUnmount(() => {
             </fieldset>
           </section>
           <p v-if="running" class="hint">
-            Изменение настроек — после отключения.
+            Настройки подключения применятся с переподключением.
           </p>
-          <button
-            class="primary"
-            :disabled="busy || running"
-            @click="saveSettings"
-          >
+          <button class="primary" :disabled="busy" @click="saveSettings">
             Сохранить настройки</button
           ><button class="text-row" @click="page = 'logs'">
             <ScrollText :size="16" />Журнал подключения<ChevronRight

@@ -43,6 +43,7 @@ test("import, connection state, settings drafts, routing and themes", async ({
     recentLogs: [],
   };
   const errors: string[] = [];
+  const calls: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.route("**/wails/runtime", async (route) => {
     const req = route.request().postDataJSON();
@@ -50,6 +51,7 @@ test("import, connection state, settings drafts, routing and themes", async ({
     if (req.object === 0) {
       const method = ids[req.args.methodID],
         args = req.args.args || [];
+      calls.push(method);
       if (method === "GetConfig") result = cfg;
       else if (method === "GetState") result = state;
       else if (method === "SaveConfig") cfg = args[0];
@@ -120,8 +122,18 @@ test("import, connection state, settings drafts, routing and themes", async ({
   ).toHaveCount(0);
   await expect(
     page.getByRole("switch", { name: "VPN для всего устройства" }),
-  ).toBeDisabled();
-  await page.getByRole("button", { name: "Назад", exact: true }).click();
+  ).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Сохранить настройки" }),
+  ).toBeEnabled();
+  await page.getByRole("switch", { name: "VPN для всего устройства" }).check();
+  calls.length = 0;
+  await page.getByRole("button", { name: "Сохранить настройки" }).click();
+  await expect(page.getByText("Соединение активно")).toBeVisible();
+  expect(
+    calls.filter((m) => ["StopProxy", "SaveConfig", "StartProxy"].includes(m)),
+  ).toEqual(["StopProxy", "SaveConfig", "StartProxy"]);
+  expect(state.tunRunning).toBe(true);
   await page.getByRole("button", { name: "Отключить", exact: true }).click();
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
   await assertFits(page);
@@ -176,6 +188,27 @@ test("import, connection state, settings drafts, routing and themes", async ({
     await page.screenshot({
       fullPage: true,
       path: path.join(process.env.SUDOKU_PREVIEW_DIR, "settings-light.png"),
+    });
+  }
+  for (const theme of ["Тёмная", "Светлая"]) {
+    await page.getByRole("button", { name: theme, exact: true }).click();
+    await expect(page.locator(".toggle-row input").first()).toHaveCSS(
+      "opacity",
+      "0",
+    );
+    await page.evaluate(() => {
+      document
+        .querySelectorAll(".toggle-row input")
+        .forEach((e) => ((e as HTMLInputElement).disabled = true));
+    });
+    await expect(page.locator(".toggle-row input").first()).toHaveCSS(
+      "opacity",
+      "0",
+    );
+    await page.evaluate(() => {
+      document
+        .querySelectorAll(".toggle-row input")
+        .forEach((e) => ((e as HTMLInputElement).disabled = false));
     });
   }
   expect(errors).toEqual([]);
