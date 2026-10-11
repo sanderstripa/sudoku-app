@@ -35,8 +35,8 @@ func TestDefaultConfigUsesCurrentPlatformTunDefaults(t *testing.T) {
 	if cfg.UI.Theme != "auto" {
 		t.Fatalf("expected auto to be the default theme, got %q", cfg.UI.Theme)
 	}
-	if cfg.Tun.Enabled {
-		t.Fatalf("expected TUN default to be disabled")
+	if cfg.Tun.Enabled != want.Enabled {
+		t.Fatalf("expected TUN default %v, got %v", want.Enabled, cfg.Tun.Enabled)
 	}
 	if cfg.Tun.BlockQUIC != want.BlockQUIC {
 		t.Fatalf("expected BlockQUIC default %v, got %v", want.BlockQUIC, cfg.Tun.BlockQUIC)

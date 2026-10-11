@@ -98,7 +98,7 @@ async function reload() {
 async function toggle() {
   await action(async () => {
     if (running.value) await api.stopProxy();
-    else await api.startProxy({ withTun: !!config.value?.tun.enabled });
+    else await api.startProxy({ withTun: true });
     await reload();
   });
 }
@@ -194,9 +194,10 @@ async function saveSettings() {
     ];
     const c = JSON.parse(JSON.stringify(draft.value)) as AppConfig;
     c.ui.theme = theme.value;
-    c.routing.proxyMode = split.value && clean.length ? "pac" : "global";
+    c.tun.enabled = true;
+    c.routing.proxyMode = split.value ? "pac" : "global";
     c.routing.ruleUrls = [];
-    c.routing.customRulesEnabled = split.value && clean.length > 0;
+    c.routing.customRulesEnabled = split.value;
     c.routing.customRules = clean
       .map((s) => "DOMAIN-SUFFIX," + s + ",DIRECT")
       .join("\n");
@@ -210,7 +211,7 @@ async function saveSettings() {
     } catch (e) {
       if (reconnect) {
         try {
-          await api.startProxy({ withTun: !!config.value?.tun.enabled });
+          await api.startProxy({ withTun: true });
         } catch {
           /* The original save error is shown; reload preserves current state. */
         }
@@ -220,7 +221,7 @@ async function saveSettings() {
       await reload();
     }
     if (reconnect) {
-      await api.startProxy({ withTun: !!c.tun.enabled });
+      await api.startProxy({ withTun: true });
       await reload();
     }
     message.value = "Настройки сохранены";
@@ -345,9 +346,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div class="mode-note">
-          <span class="status-dot" />{{
-            config?.tun.enabled ? "VPN · всё устройство" : "Системный прокси"
-          }}<span>·</span
+          <span class="status-dot" />VPN · всё устройство<span>·</span
           >{{
             config?.routing.proxyMode === "pac"
               ? "С исключениями"
@@ -399,12 +398,6 @@ onBeforeUnmount(() => {
           <section class="settings-section">
             <h2><Link2 :size="17" />ПОДКЛЮЧЕНИЕ</h2>
             <fieldset :disabled="busy">
-              <label class="toggle-row"
-                >VPN для всего устройства<input
-                  v-model="draft.tun.enabled"
-                  type="checkbox"
-                  role="switch" /><span class="switch"
-              /></label>
               <label class="toggle-row"
                 >Запускать вместе с Windows<input
                   v-model="draft.ui.launchAtLogin"

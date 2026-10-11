@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const configVersion = 6
+const configVersion = 7
 
 type Store struct {
 	rootDir    string
@@ -87,7 +87,13 @@ func (s *Store) Load() (*AppConfig, error) {
 	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return nil, fmt.Errorf("unmarshal config: %w", err)
 	}
+	previousVersion := cfg.Version
 	normalizeConfig(&cfg, s.runtimeDir)
+	if runtime.GOOS == "windows" && previousVersion < configVersion {
+		if err := s.Save(&cfg); err != nil {
+			return nil, err
+		}
+	}
 	return &cfg, nil
 }
 
@@ -179,10 +185,9 @@ func normalizeConfigForOS(cfg *AppConfig, runtimeDir string, goos string) {
 	if cfg.Routing.RuleURLs == nil {
 		cfg.Routing.RuleURLs = []string{}
 	}
-	// PAC mode requires rule URLs. If a user accidentally cleared the list (and has no custom rules),
-	// fall back to the recommended defaults so routing doesn't silently become global.
+	// Keep legacy rule defaults, but an explicitly enabled exception list may be empty.
 	if cfg.Routing.ProxyMode == "pac" && len(cfg.Routing.RuleURLs) == 0 {
-		if !cfg.Routing.CustomRulesEnabled || strings.TrimSpace(cfg.Routing.CustomRules) == "" {
+		if !cfg.Routing.CustomRulesEnabled {
 			cfg.Routing.RuleURLs = defaultPACRuleURLs()
 		}
 	}
@@ -295,6 +300,9 @@ func normalizeConfigForOS(cfg *AppConfig, runtimeDir string, goos string) {
 	for i := range cfg.Nodes {
 		normalizeNode(&cfg.Nodes[i], cfg.Core.LocalPort)
 	}
+	if goos == "windows" {
+		cfg.Tun.Enabled = true
+	}
 	if cfg.ActiveNodeID == "" && len(cfg.Nodes) > 0 {
 		cfg.ActiveNodeID = cfg.Nodes[0].ID
 	}
@@ -316,7 +324,7 @@ func defaultTunSettings(goos string) TunSettings {
 		interfaceName = "tun0"
 	}
 	return TunSettings{
-		Enabled:        false,
+		Enabled:        goos == "windows",
 		InterfaceName:  interfaceName,
 		MTU:            8500,
 		IPv4:           "198.18.0.1",

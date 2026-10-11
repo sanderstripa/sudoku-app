@@ -51,6 +51,9 @@ func (b *Backend) prepareProxyStartLocked(req StartRequest) (proxyStartPlan, err
 	}
 	plan.node = *node
 	plan.withTun = req.WithTun && b.cfg.Tun.Enabled
+	if runtime.GOOS == "windows" {
+		plan.withTun = true
+	}
 
 	runtimeConfig, warnings, err := effectiveRuntimeConfig(b.cfg, plan.withTun)
 	if err != nil {

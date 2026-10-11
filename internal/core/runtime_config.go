@@ -68,6 +68,11 @@ func buildSudokuClientConfig(cfg *AppConfig, node NodeConfig, customPACURL strin
 		case "global":
 			ruleURLs = []string{"global"}
 		case "pac":
+			if cfg.Routing.CustomRulesEnabled && strings.TrimSpace(cfg.Routing.CustomRules) == "" && len(cfg.Routing.RuleURLs) == 0 {
+				// An empty exception list means everything remains in the VPN.
+				ruleURLs = []string{"global"}
+				break
+			}
 			ruleURLs = append([]string(nil), cfg.Routing.RuleURLs...)
 			if cfg.Routing.CustomRulesEnabled && strings.TrimSpace(cfg.Routing.CustomRules) != "" && strings.TrimSpace(customPACURL) != "" {
 				ruleURLs = append([]string{strings.TrimSpace(customPACURL)}, ruleURLs...)

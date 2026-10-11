@@ -15,7 +15,7 @@ test("import, connection state, settings drafts, routing and themes", async ({
   page,
 }) => {
   let cfg: any = {
-    version: 6,
+    version: 7,
     activeNodeId: "",
     nodes: [],
     routing: {
@@ -24,7 +24,7 @@ test("import, connection state, settings drafts, routing and themes", async ({
       customRulesEnabled: false,
       customRules: "",
     },
-    tun: { enabled: false },
+    tun: { enabled: true },
     core: { autoStart: false },
     ui: { theme: "auto", language: "ru", launchAtLogin: false },
     reverseClient: { routes: [] },
@@ -114,7 +114,7 @@ test("import, connection state, settings drafts, routing and themes", async ({
   await expect(page.getByText("Нидерланды", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Подключить", exact: true }).click();
   await expect(page.getByText("Соединение активно")).toBeVisible();
-  expect(state.tunRunning).toBe(false);
+  expect(state.tunRunning).toBe(true);
   await expect(page.locator("main")).not.toContainText(/\b\d{2}:\d{2}:\d{2}\b/);
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
   await expect(
@@ -122,11 +122,12 @@ test("import, connection state, settings drafts, routing and themes", async ({
   ).toHaveCount(0);
   await expect(
     page.getByRole("switch", { name: "VPN для всего устройства" }),
-  ).toBeEnabled();
+  ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Сохранить настройки" }),
   ).toBeEnabled();
-  await page.getByRole("switch", { name: "VPN для всего устройства" }).check();
+  await page.getByRole("combobox", { name: "Режим" }).click();
+  await page.getByRole("option", { name: "Все, кроме списка" }).click();
   calls.length = 0;
   await page.getByRole("button", { name: "Сохранить настройки" }).click();
   await expect(page.getByText("Соединение активно")).toBeVisible();
@@ -134,6 +135,10 @@ test("import, connection state, settings drafts, routing and themes", async ({
     calls.filter((m) => ["StopProxy", "SaveConfig", "StartProxy"].includes(m)),
   ).toEqual(["StopProxy", "SaveConfig", "StartProxy"]);
   expect(state.tunRunning).toBe(true);
+  expect(cfg.routing.proxyMode).toBe("pac");
+  await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  await expect(page.getByLabel("Домены исключений")).toBeVisible();
+  await page.getByRole("button", { name: "Назад", exact: true }).click();
   await page.getByRole("button", { name: "Отключить", exact: true }).click();
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
   await assertFits(page);
@@ -190,15 +195,28 @@ test("import, connection state, settings drafts, routing and themes", async ({
       path: path.join(process.env.SUDOKU_PREVIEW_DIR, "settings-light.png"),
     });
   }
-  if (await page.getByRole("combobox", { name: "Режим" }).count() === 0) {
+  if ((await page.getByRole("combobox", { name: "Режим" }).count()) === 0) {
     await page.getByRole("button", { name: "Настройки", exact: true }).click();
   }
   for (const theme of ["Тёмная", "Светлая"]) {
     await page.getByRole("button", { name: theme, exact: true }).click();
     await page.getByRole("combobox", { name: "Режим" }).click();
     await expect(page.getByRole("listbox")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Сохранить настройки" })).toHaveCSS("opacity", "1");
-    await expect.poll(() => page.getByRole("combobox", { name: "Режим" }).evaluate(e => getComputedStyle(e).backgroundColor === getComputedStyle(document.getElementById("routing-options")!).backgroundColor)).toBe(true);
+    await expect(
+      page.getByRole("button", { name: "Сохранить настройки" }),
+    ).toHaveCSS("opacity", "1");
+    await expect
+      .poll(() =>
+        page
+          .getByRole("combobox", { name: "Режим" })
+          .evaluate(
+            (e) =>
+              getComputedStyle(e).backgroundColor ===
+              getComputedStyle(document.getElementById("routing-options")!)
+                .backgroundColor,
+          ),
+      )
+      .toBe(true);
     const colours = await page
       .getByRole("option")
       .first()
