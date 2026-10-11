@@ -140,9 +140,8 @@ test("import, connection state, settings drafts, routing and themes", async ({
   await page.getByRole("switch", { name: "Подключаться при запуске" }).check();
   await page.getByRole("button", { name: "Тёмная", exact: true }).click();
   expect(cfg.core.autoStart).toBe(false);
-  await page
-    .getByRole("combobox", { name: "Режим" })
-    .selectOption({ label: "Все, кроме списка" });
+  await page.getByRole("combobox", { name: "Режим" }).click();
+  await page.getByRole("option", { name: "Все, кроме списка" }).click();
   for (const size of [
     { width: 410, height: 660 },
     { width: 360, height: 620 },
@@ -192,6 +191,25 @@ test("import, connection state, settings drafts, routing and themes", async ({
   }
   for (const theme of ["Тёмная", "Светлая"]) {
     await page.getByRole("button", { name: theme, exact: true }).click();
+    await page.getByRole("combobox", { name: "Режим" }).click();
+    await expect(page.getByRole("listbox")).toBeVisible();
+    const colours = await page
+      .getByRole("option")
+      .first()
+      .evaluate((e) => ({
+        text: getComputedStyle(e).color,
+        background: getComputedStyle(e.parentElement!).backgroundColor,
+      }));
+    expect(colours.text).not.toBe(colours.background);
+    if (process.env.SUDOKU_PREVIEW_DIR)
+      await page.screenshot({
+        path: path.join(
+          process.env.SUDOKU_PREVIEW_DIR,
+          `settings-menu-${theme === "Тёмная" ? "dark" : "light"}.png`,
+        ),
+      });
+    await page.getByRole("combobox", { name: "Режим" }).press("Escape");
+    await expect(page.getByRole("listbox")).toHaveCount(0);
     await expect(page.locator(".toggle-row input").first()).toHaveCSS(
       "opacity",
       "0",

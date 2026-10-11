@@ -33,6 +33,7 @@ import {
 } from "lucide-vue-next";
 import { backendApi as api } from "./api";
 import type { AppConfig, RuntimeState } from "./types";
+import ModeSelect from "./ModeSelect.vue";
 const draft = ref<AppConfig>();
 const config = ref<AppConfig>(),
   state = ref<RuntimeState>();
@@ -421,10 +422,7 @@ onBeforeUnmount(() => {
             <h2><GitBranch :size="17" />РАЗДЕЛЬНОЕ ТУННЕЛИРОВАНИЕ</h2>
             <fieldset :disabled="busy">
               <label class="field-label" for="routing">Режим</label
-              ><select id="routing" v-model="split">
-                <option :value="false">Весь трафик через VPN</option>
-                <option :value="true">Все, кроме списка</option></select
-              ><textarea
+              ><ModeSelect v-model="split" :disabled="busy" /><textarea
                 v-if="split"
                 v-model="domains"
                 aria-label="Домены исключений"
