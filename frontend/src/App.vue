@@ -359,13 +359,6 @@ onBeforeUnmount(() => {
               : "Весь трафик"
           }}
         </div>
-        <button
-          class="primary"
-          :disabled="busy || (!active && !running)"
-          @click="toggle"
-        >
-          {{ busy ? "Подождите…" : running ? "Отключить" : "Подключить" }}
-        </button>
       </template>
       <template v-else>
         <div class="page-heading">
@@ -433,7 +426,7 @@ onBeforeUnmount(() => {
               </p>
             </fieldset>
           </section>
-          <p v-if="running" class="hint">
+          <p v-if="running" class="hint reconnect-hint">
             Настройки подключения применятся с переподключением.
           </p>
           <button class="primary" :disabled="busy" @click="saveSettings">

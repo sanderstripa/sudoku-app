@@ -101,7 +101,7 @@ test("import, connection state, settings drafts, routing and themes", async ({
   await assertFits(page);
   await expect(page.getByText("Добавьте сервер, чтобы начать")).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Подключить", exact: true }),
+    page.getByRole("button", { name: "Подключить VPN", exact: true }),
   ).toBeDisabled();
   await page.getByRole("button", { name: /Добавить соединение/ }).click();
   await page
@@ -112,8 +112,10 @@ test("import, connection state, settings drafts, routing and themes", async ({
     .getByRole("button", { name: "Добавить соединение", exact: true })
     .click();
   await expect(page.getByText("Нидерланды", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Подключить", exact: true }).click();
+  await page.getByRole("button", { name: "Подключить VPN", exact: true }).click();
   await expect(page.getByText("Соединение активно")).toBeVisible();
+  await expect(page.locator(".power-button")).toHaveCount(1);
+  await expect(page.locator(".page-home .primary")).toHaveCount(0);
   expect(state.tunRunning).toBe(true);
   await expect(page.locator("main")).not.toContainText(/\b\d{2}:\d{2}:\d{2}\b/);
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
@@ -138,8 +140,14 @@ test("import, connection state, settings drafts, routing and themes", async ({
   expect(cfg.routing.proxyMode).toBe("pac");
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
   await expect(page.getByLabel("Домены исключений")).toBeVisible();
+  await page.setViewportSize({width: 328, height: 528});
+  await assertFits(page);
+  const hint = await page.locator('.reconnect-hint').boundingBox();
+  const save = await page.getByRole('button', {name: 'Сохранить настройки'}).boundingBox();
+  expect(save!.y - (hint!.y + hint!.height)).toBeGreaterThanOrEqual(14);
+  await page.setViewportSize({width: 410, height: 660});
   await page.getByRole("button", { name: "Назад", exact: true }).click();
-  await page.getByRole("button", { name: "Отключить", exact: true }).click();
+  await page.getByRole("button", { name: "Отключить VPN", exact: true }).click();
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
   await assertFits(page);
   await page.getByRole("switch", { name: "Подключаться при запуске" }).check();

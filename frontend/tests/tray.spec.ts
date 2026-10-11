@@ -10,10 +10,12 @@ test('tray follows theme, toggles connection, selects profiles and allows captur
   const state = {running:false};
   const calls: string[] = [];
   const errors: string[] = [];
+  let requestedHeight = 0;
   page.on('pageerror', e => errors.push(e.message));
   await page.route('**/wails/runtime', async route => {
     const req = route.request().postDataJSON();
     let result: unknown = null;
+    if(req.object === 6 && req.method === 33) requestedHeight = req.args.height;
     if(req.object === 0) {
       const method = ids[req.args.methodID];
       calls.push(method);
@@ -27,6 +29,9 @@ test('tray follows theme, toggles connection, selects profiles and allows captur
   });
   await page.goto('/?tray=1');
   await expect(page.getByText('Состояние: отключено')).toBeVisible();
+  await expect.poll(() => requestedHeight).toBeGreaterThan(180);
+  expect(requestedHeight).toBeLessThan(230);
+  await page.setViewportSize({width:250,height:requestedHeight});
   await page.getByRole('button', {name:'Подключить',exact:true}).click();
   await expect(page.getByText('Состояние: подключено')).toBeVisible();
   await page.getByRole('button', {name:'Отключить',exact:true}).click();

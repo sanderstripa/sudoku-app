@@ -676,6 +676,9 @@ footer {
   margin: 6px 0 0;
   line-height: 1.4;
 }
+.page-settings .reconnect-hint {
+  margin-bottom: 14px;
+}
 .page-settings .field-label {
   margin-bottom: 6px;
 }
@@ -749,7 +752,7 @@ footer {
     font-size: 16px;
   }
   .settings-section {
-    padding: 6px 0;
+    padding: 5px 0;
   }
   .settings-section h2 {
     margin-bottom: 5px;

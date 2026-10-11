@@ -6,6 +6,9 @@ import { backendApi as api } from './api';
 import type { AppConfig, RuntimeState } from './types';
 const config = ref<AppConfig>(), state = ref<RuntimeState>();
 const profiles = ref(false), busy = ref(false), error = ref('');
+const panel = ref<HTMLElement>();
+let observer: ResizeObserver;
+let lastHeight = 0;
 let timer: ReturnType<typeof setInterval>;
 let polling = false;
 const media = matchMedia('(prefers-color-scheme: dark)');
@@ -29,12 +32,19 @@ async function action(fn: () => Promise<unknown>) {
 function open(page: string) { Events.Emit('tray:open', page); }
 function toggleConnection() { return action(() => state.value?.running ? api.stopProxy() : api.startProxy({withTun: true})); }
 function selectProfile(id: string) { return action(() => api.switchNode(id)); }
-onMounted(() => { void refresh(); timer = setInterval(refresh, 800); media.addEventListener('change', theme); });
-onBeforeUnmount(() => { clearInterval(timer); media.removeEventListener('change', theme); });
+onMounted(() => {
+  observer = new ResizeObserver(() => {
+    const height = Math.ceil(panel.value?.getBoundingClientRect().height || 220);
+    if (height !== lastHeight) { lastHeight = height; void Window.SetSize(250, height).catch(() => {}); }
+  });
+  if (panel.value) observer.observe(panel.value);
+  void refresh(); timer = setInterval(refresh, 800); media.addEventListener('change', theme);
+});
+onBeforeUnmount(() => { observer?.disconnect(); clearInterval(timer); media.removeEventListener('change', theme); });
 </script>
 
 <template>
-  <div class="tray-panel">
+  <div ref="panel" class="tray-panel">
     <div class="tray-status"><span>{{ state?.running ? 'Состояние: подключено' : 'Состояние: отключено' }}</span><button aria-label="Закрыть меню" @click="Window.Hide()"><X :size="13"/></button></div>
     <template v-if="!profiles">
       <button class="tray-connect" :disabled="busy" @click="toggleConnection">{{ busy ? 'Подождите…' : state?.running ? 'Отключить' : 'Подключить' }}</button>
@@ -58,7 +68,7 @@ onBeforeUnmount(() => { clearInterval(timer); media.removeEventListener('change'
 </template>
 
 <style scoped>
-.tray-panel { padding: 10px 12px; height: 100vh; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; overflow: auto; font-size: 12px; }
+.tray-panel { padding: 10px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; overflow: auto; font-size: 12px; }
 .tray-status { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 11px; height: 24px; }
 .tray-status button { padding: 3px; width: auto; }
 button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 6px; text-align: left; border-radius: 5px; min-height: 31px; }

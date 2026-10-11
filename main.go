@@ -168,7 +168,7 @@ func main() {
 	configureApplicationMenu(app, mainWindow)
 
 	trayWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name: "tray-menu", Title: "Sudoku — меню", Width: 250, Height: 255,
+		Name: "tray-menu", Title: "Sudoku — меню", Width: 250, Height: 220,
 		URL: "/?tray=1", Frameless: true, Hidden: true, AlwaysOnTop: true,
 		ContentProtectionEnabled: false, BackgroundColour: backgroundColour,
 		Windows: application.WindowsWindow{DisableFramelessWindowDecorations: false},
@@ -177,8 +177,9 @@ func main() {
 		event.Cancel()
 		trayWindow.Hide()
 	})
-	// Keep the popup visible when screen clipping takes focus. Escape,
-	// selecting an action, or clicking the tray icon again closes it.
+	trayWindow.OnWindowEvent(events.Common.WindowLostFocus, func(_ *application.WindowEvent) {
+		trayWindow.Hide()
+	})
 	tray := app.SystemTray.New()
 	tray.SetTooltip("Sudoku")
 	if runtime.GOOS == "darwin" {
