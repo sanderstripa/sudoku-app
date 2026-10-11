@@ -95,6 +95,8 @@ test("import, connection state, settings drafts, routing and themes", async ({
     r.fulfill({ status: 404, body: "" }),
   );
   await page.goto("/");
+  await page.evaluate(() => document.fonts.ready);
+  await assertFits(page);
   await expect(page.getByText("Добавьте сервер, чтобы начать")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Подключить", exact: true }),
@@ -110,6 +112,8 @@ test("import, connection state, settings drafts, routing and themes", async ({
   await expect(page.getByText("Нидерланды", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Подключить", exact: true }).click();
   await expect(page.getByText("Соединение активно")).toBeVisible();
+  expect(state.tunRunning).toBe(false);
+  await expect(page.locator("main")).not.toContainText(/\b\d{2}:\d{2}:\d{2}\b/);
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
   await expect(
     page.getByRole("checkbox", { name: "VPN для всего устройства" }),
@@ -120,12 +124,22 @@ test("import, connection state, settings drafts, routing and themes", async ({
   await page.getByRole("button", { name: "Назад", exact: true }).click();
   await page.getByRole("button", { name: "Отключить", exact: true }).click();
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  await assertFits(page);
   await page.getByRole("switch", { name: "Подключаться при запуске" }).check();
   await page.getByRole("button", { name: "Тёмная", exact: true }).click();
   expect(cfg.core.autoStart).toBe(false);
   await page
     .getByRole("combobox", { name: "Режим" })
     .selectOption({ label: "Все, кроме списка" });
+  for (const size of [
+    { width: 410, height: 660 },
+    { width: 360, height: 620 },
+    { width: 328, height: 528 },
+  ]) {
+    await page.setViewportSize(size);
+    await assertFits(page);
+  }
+  await page.setViewportSize({ width: 410, height: 660 });
   await page.getByLabel("Домены исключений").fill("https://bad.example");
   await page.getByRole("button", { name: "Сохранить настройки" }).click();
   await expect(page.getByRole("alert")).toContainText("Укажите домены");
@@ -146,12 +160,18 @@ test("import, connection state, settings drafts, routing and themes", async ({
       path: path.join(process.env.SUDOKU_PREVIEW_DIR, "sudoku-dark.png"),
     });
     await page.getByRole("button", { name: "Настройки", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Сохранить настройки" }),
+    ).toBeEnabled();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       fullPage: true,
       path: path.join(process.env.SUDOKU_PREVIEW_DIR, "settings-dark.png"),
     });
     await page.getByRole("button", { name: "Светлая", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Сохранить настройки" }),
+    ).toBeEnabled();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       fullPage: true,
@@ -160,3 +180,33 @@ test("import, connection state, settings drafts, routing and themes", async ({
   }
   expect(errors).toEqual([]);
 });
+
+async function assertFits(page: import("@playwright/test").Page) {
+  await expect(page.locator("main")).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const metrics = await page.evaluate(() => {
+    const main = document.querySelector("main")!;
+    const footer = document.querySelector("footer")!.getBoundingClientRect();
+    const controls = [
+      ...main.querySelectorAll("button,select,textarea,input"),
+    ].filter((e) => e.getBoundingClientRect().height);
+    return {
+      viewport: innerHeight,
+      root: document.documentElement.scrollHeight,
+      width: document.documentElement.scrollWidth,
+      viewportWidth: innerWidth,
+      footerBottom: footer.bottom,
+      lastControl: Math.max(
+        ...controls.map((e) => e.getBoundingClientRect().bottom),
+      ),
+      footerTop: footer.top,
+    };
+  });
+  expect(metrics.root).toBeLessThanOrEqual(metrics.viewport);
+  expect(metrics.width).toBeLessThanOrEqual(metrics.viewportWidth);
+  expect(metrics.footerBottom).toBeLessThanOrEqual(metrics.viewport + 1);
+  expect(metrics.lastControl).toBeLessThanOrEqual(metrics.footerTop);
+  await expect(page.locator("main")).not.toContainText(
+    /ЛИЧНОЕ СОЕДИНЕНИЕ|Свобода быть онлайн|Ваше спокойное пространство|Для VPN запустите приложение/,
+  );
+}

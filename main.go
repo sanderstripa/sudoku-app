@@ -120,7 +120,7 @@ func main() {
 		Width:                  410,
 		Height:                 660,
 		MinWidth:               360,
-		MinHeight:              580,
+		MinHeight:              660,
 		URL:                    "/",
 		Frameless:              true,
 		BackgroundType:         backgroundType,

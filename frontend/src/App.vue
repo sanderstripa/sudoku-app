@@ -60,18 +60,6 @@ const healthy = computed(
     !state.value?.routeSetupError,
 );
 const sample = computed(() => state.value?.traffic.recentBandwidth?.at(-1));
-const clock = ref(Date.now());
-const elapsed = computed(() => {
-  const s = Math.max(
-    0,
-    Math.floor(
-      clock.value / 1000 - (state.value?.startedAtUnix || clock.value / 1000),
-    ),
-  );
-  return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60]
-    .map((n) => String(n).padStart(2, "0"))
-    .join(":");
-});
 let timer: ReturnType<typeof setInterval> | undefined;
 let polling = false;
 const media = matchMedia("(prefers-color-scheme: dark)");
@@ -161,6 +149,9 @@ watch(page, async () => {
   await nextTick();
   window.scrollTo(0, 0);
 });
+watch(domains, () => {
+  error.value = "";
+});
 function openSettings() {
   message.value = "";
   error.value = "";
@@ -242,7 +233,6 @@ onMounted(async () => {
     loading.value = false;
   }
   timer = setInterval(async () => {
-    clock.value = Date.now();
     if (polling) return;
     polling = true;
     try {
@@ -272,11 +262,10 @@ onBeforeUnmount(() => {
       </div>
     </header>
     <div v-if="loading" class="loading">Загрузка…</div>
-    <main v-else>
+    <main v-else :class="'page-' + page">
       <template v-if="page === 'home'">
         <div class="eyebrow-row">
-          <span class="eyebrow">ЛИЧНОЕ СОЕДИНЕНИЕ</span
-          ><button
+          <button
             class="icon-button"
             aria-label="Настройки"
             @click="openSettings"
@@ -305,24 +294,7 @@ onBeforeUnmount(() => {
           >
             <Power :size="43" :stroke-width="1.2" />
           </button>
-          <h1>
-            {{
-              healthy
-                ? "Вы подключены"
-                : running
-                  ? "Соединение запущено"
-                  : "Свобода быть онлайн"
-            }}
-          </h1>
-          <p class="muted">
-            {{
-              healthy
-                ? elapsed
-                : active
-                  ? "Ваше спокойное пространство в сети"
-                  : "Добавьте сервер, чтобы начать"
-            }}
-          </p>
+          <p v-if="!active" class="muted">Добавьте сервер, чтобы начать</p>
         </section>
         <button v-if="active" class="server-card" @click="page = 'servers'">
           <ShieldCheck :size="23" :stroke-width="1.3" /><span
@@ -411,10 +383,6 @@ onBeforeUnmount(() => {
                   type="checkbox"
                   role="switch" /><span class="switch"
               /></label>
-              <p class="hint">
-                Для VPN запустите приложение от имени администратора. Без VPN
-                используется системный прокси.
-              </p>
               <label class="toggle-row"
                 >Запускать вместе с Windows<input
                   v-model="draft.ui.launchAtLogin"
@@ -442,13 +410,13 @@ onBeforeUnmount(() => {
                 placeholder="hh.ru&#10;avito.ru&#10;vk.ru"
                 rows="3"
               />
-              <p class="hint">
-                Один домен на строку. Правило включает его поддомены.
+              <p v-if="split" class="hint">
+                Один домен на строку. Включая поддомены.
               </p>
             </fieldset>
           </section>
           <p v-if="running" class="hint">
-            Отключите соединение, чтобы изменить настройки подключения.
+            Изменение настроек — после отключения.
           </p>
           <button
             class="primary"
@@ -539,12 +507,13 @@ onBeforeUnmount(() => {
       >
         {{ error || state?.routeSetupError || state?.lastError }}
       </div>
-      <div v-if="message" class="notice" role="status">{{ message }}</div>
     </main>
     <footer>
       <button @click="page = 'servers'">
         <Link2 :size="13" />{{ config?.nodes.length || 0 }} соединений</button
-      ><span>SUDOKU VPN</span>
+      ><span :role="message ? 'status' : undefined">{{
+        message || "SUDOKU VPN"
+      }}</span>
     </footer>
     <div
       v-if="importing"

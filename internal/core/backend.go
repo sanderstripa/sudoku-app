@@ -295,6 +295,11 @@ func (b *Backend) Startup(_ context.Context) {
 	b.startPACServer()
 
 	go b.monitorLoop()
+	if runtime.GOOS == "windows" && b.GetConfig().UI.LaunchAtLogin {
+		if err := setLaunchAtLogin(true); err != nil {
+			b.addLog("warn", "app", err.Error())
+		}
+	}
 	if windowsRecoveryErr != nil {
 		b.addLog("warn", "route", fmt.Sprintf("windows startup route recovery failed; auto-start disabled: %v", windowsRecoveryErr))
 	}
