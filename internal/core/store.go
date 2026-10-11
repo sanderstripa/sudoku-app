@@ -109,8 +109,25 @@ func (s *Store) Save(cfg *AppConfig) error {
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
-	if err := os.WriteFile(s.configPath, buf, 0o644); err != nil {
+	file, err := os.CreateTemp(s.rootDir, ".config-*.tmp")
+	if err != nil {
+		return fmt.Errorf("create config: %w", err)
+	}
+	tempPath := file.Name()
+	defer os.Remove(tempPath)
+	if _, err := file.Write(buf); err != nil {
+		file.Close()
 		return fmt.Errorf("write config: %w", err)
+	}
+	if err := file.Sync(); err != nil {
+		file.Close()
+		return fmt.Errorf("flush config: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close config: %w", err)
+	}
+	if err := os.Rename(tempPath, s.configPath); err != nil {
+		return fmt.Errorf("replace config: %w", err)
 	}
 	return nil
 }

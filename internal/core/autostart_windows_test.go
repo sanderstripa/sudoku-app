@@ -3,19 +3,40 @@
 package core
 
 import (
-	"strings"
+	"fmt"
+	"golang.org/x/sys/windows/registry"
+	"os"
 	"testing"
+	"time"
 )
 
-func TestAutostartUsesNormalInteractiveUserAndQuotesExecutable(t *testing.T) {
-	script := windowsAutostartScript(`C:\Users\O'Neil\My VPN\Sudoku.exe`, true)
-	for _, required := range []string{`-Execute 'C:\Users\O''Neil\My VPN\Sudoku.exe'`, `-LogonType Interactive -RunLevel Limited`, `-AtLogOn -User $identity.Name`, `$identity.User.Value`, `-ExecutionTimeLimit ([TimeSpan]::Zero)`, `-MultipleInstances IgnoreNew`} {
-		if !strings.Contains(script, required) {
-			t.Fatalf("missing %q", required)
-		}
+func TestAutostartQuotesExecutable(t *testing.T) {
+	exe := `C:\Users\O'Neil\My VPN\Sudoku.exe`
+	if got := windowsAutostartCommand(exe); got != `"`+exe+`" --autostart` {
+		t.Fatal(got)
 	}
-	disabled := windowsAutostartScript("ignored", false)
-	if !strings.Contains(disabled, "Unregister-ScheduledTask") || strings.Contains(disabled, "Register-ScheduledTask ") || !strings.Contains(disabled, "$identity.User.Value") {
-		t.Fatal("disable must only remove the current user's task")
+}
+
+func TestAutostartRegistryRoundTrip(t *testing.T) {
+	path := fmt.Sprintf(`Software\Sudoku-Test-%d-%d`, os.Getpid(), time.Now().UnixNano())
+	defer registry.DeleteKey(registry.CURRENT_USER, path)
+	exe := `C:\Program Files\Sudoku\Sudoku.exe`
+	if err := setWindowsRunEntry(path, "test", exe, true); err != nil {
+		t.Fatal(err)
+	}
+	key, err := registry.OpenKey(registry.CURRENT_USER, path, registry.QUERY_VALUE)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual, _, err := key.GetStringValue("test")
+	key.Close()
+	if err != nil || actual != windowsAutostartCommand(exe) {
+		t.Fatalf("readback: %q %v", actual, err)
+	}
+	if err := setWindowsRunEntry(path, "test", exe, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := setWindowsRunEntry(path, "test", exe, false); err != nil {
+		t.Fatal(err)
 	}
 }

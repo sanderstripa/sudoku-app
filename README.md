@@ -62,7 +62,7 @@ npm run build
 
 GitHub Actions checks and builds the application and installer. Tagged releases publish both executables to GitHub Releases. Executables are not code-signed.
 
-The build uses Sudoku `v0.5.1` with source patches, HEV `2.17.1`, Wails `v3.0.0-alpha.74` and frontend runtime `3.0.0-alpha.79`. Dependencies are recorded in `go.sum` and `frontend/package-lock.json`. Windows connections use TUN; the current client does not modify system proxy or WinHTTP settings.
+The build uses Sudoku `v0.5.1` with source patches, HEV `2.17.1`, Wails `v3.0.0-alpha.74` and frontend runtime `3.0.0-alpha.79`. Dependencies are recorded in `go.sum` and `frontend/package-lock.json`. Windows connections use TUN; the current client does not modify system proxy or WinHTTP settings. Launch with Windows uses a standard per-user Run entry with a quoted executable path and normal UI permissions. Settings are written through a temporary file and replaced after the write completes.
 
 ## Credits and license
 

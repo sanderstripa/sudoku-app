@@ -151,6 +151,7 @@ test("import, connection state, settings drafts, routing and themes", async ({
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
   await assertFits(page);
   await page.getByRole("switch", { name: "Подключаться при запуске" }).check();
+  await page.getByRole("switch", { name: "Запускать вместе с Windows" }).check();
   await page.getByRole("button", { name: "Тёмная", exact: true }).click();
   expect(cfg.core.autoStart).toBe(false);
   await page.getByRole("combobox", { name: "Режим" }).click();
@@ -171,6 +172,7 @@ test("import, connection state, settings drafts, routing and themes", async ({
   await page.getByRole("button", { name: "Сохранить настройки" }).click();
   await expect(page.getByRole("status")).toHaveText("Настройки сохранены");
   expect(cfg.core.autoStart).toBe(true);
+  expect(cfg.ui.launchAtLogin).toBe(true);
   expect(cfg.routing.customRules).toContain("DOMAIN-SUFFIX,hh.ru,DIRECT");
   expect(cfg.routing.ruleUrls).toEqual([]);
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");

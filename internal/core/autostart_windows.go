@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/sys/windows/registry"
@@ -19,51 +20,62 @@ const (
 	windowsAutostartArgLine = "--autostart"
 )
 
+var legacyAutostartCleanup sync.Once
+
 func setLaunchAtLogin(enabled bool) error {
 	exe, err := currentExecutablePath()
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", windowsAutostartScript(exe, enabled))
-	applyManagedProcessSysProcAttr(cmd)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("Не удалось изменить автозапуск Windows: %w: %s", err, strings.TrimSpace(string(output)))
+	if err := setWindowsRunEntry(windowsRunKeyPath, windowsRunValueName, exe, enabled); err != nil {
+		return fmt.Errorf("Не удалось изменить автозапуск Windows: %w", err)
 	}
-	// Remove only this app's legacy Run entry after the task is registered/removed.
-	key, err := registry.OpenKey(registry.CURRENT_USER, windowsRunKeyPath, registry.SET_VALUE)
-	if errors.Is(err, registry.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("open legacy autostart key: %w", err)
-	}
-	defer key.Close()
-	err = key.DeleteValue(windowsRunValueName)
-	if errors.Is(err, registry.ErrNotExist) {
-		return nil
-	}
-	return err
+	// Migration must not block saving settings or depend on Task Scheduler availability.
+	legacyAutostartCleanup.Do(func() { go removeLegacyAutostartTask() })
+	return nil
 }
 
-// The desktop UI must run at normal integrity, including when launched at login.
-// Only its network helper requests elevation.
-func windowsAutostartScript(exe string, enabled bool) string {
-	lines := []string{
+func setWindowsRunEntry(path, name, exe string, enabled bool) error {
+	key, _, err := registry.CreateKey(registry.CURRENT_USER, path, registry.SET_VALUE|registry.QUERY_VALUE)
+	if err != nil {
+		return err
+	}
+	defer key.Close()
+	if !enabled {
+		err := key.DeleteValue(name)
+		if errors.Is(err, registry.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	command := windowsAutostartCommand(exe)
+	if err := key.SetStringValue(name, command); err != nil {
+		return err
+	}
+	actual, _, err := key.GetStringValue(name)
+	if err != nil {
+		return err
+	}
+	if actual != command {
+		return errors.New("autostart verification failed")
+	}
+	return nil
+}
+
+func windowsAutostartCommand(exe string) string {
+	return `"` + exe + `" ` + windowsAutostartArgLine
+}
+
+func removeLegacyAutostartTask() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	script := strings.Join([]string{
 		"$ErrorActionPreference = 'Stop'",
 		"$identity = [Security.Principal.WindowsIdentity]::GetCurrent()",
 		"$taskName = 'Sudoku-App-' + $identity.User.Value",
-	}
-	if !enabled {
-		return strings.Join(append(lines,
-			"if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName $taskName -Confirm:$false }"), "\n")
-	}
-	return strings.Join(append(lines,
-		"$action = New-ScheduledTaskAction -Execute '"+strings.ReplaceAll(exe, "'", "''")+"' -Argument '"+windowsAutostartArgLine+"'",
-		"$trigger = New-ScheduledTaskTrigger -AtLogOn -User $identity.Name",
-		"$principal = New-ScheduledTaskPrincipal -UserId $identity.Name -LogonType Interactive -RunLevel Limited",
-		"$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew",
-		"Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null"), "\n")
+		"if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) { Unregister-ScheduledTask -TaskName $taskName -Confirm:$false }",
+	}, "\n")
+	cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
+	applyManagedProcessSysProcAttr(cmd)
+	_ = cmd.Run()
 }

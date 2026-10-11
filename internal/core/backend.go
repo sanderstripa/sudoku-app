@@ -295,8 +295,8 @@ func (b *Backend) Startup(_ context.Context) {
 	b.startPACServer()
 
 	go b.monitorLoop()
-	if runtime.GOOS == "windows" && b.GetConfig().UI.LaunchAtLogin {
-		if err := setLaunchAtLogin(true); err != nil {
+	if runtime.GOOS == "windows" {
+		if err := setLaunchAtLogin(b.GetConfig().UI.LaunchAtLogin); err != nil {
 			b.addLog("warn", "app", err.Error())
 		}
 	}
