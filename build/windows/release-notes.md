@@ -1,7 +1,5 @@
-Windows 10/11 x64 · 0.1.9
+Windows 10/11 x64 · 0.1.10
 
-- Left-clicking the tray icon opens and focuses the application. Right-clicking opens the themed tray menu.
-- Domain exclusions now retain short-lived associations for real IPv4 addresses learned during direct DNS resolution. Later IP-only requests can reuse the matching domain exclusion.
-- Associations expire and are checked against active rules. Unrelated addresses remain proxied. Shared addresses may follow the associated excluded domain during this short interval.
-- Regression checks cover both resolved Ozon addresses, expiry, removed exceptions and unrelated IPs. These checks do not verify a signed-in Ozon browser session; website access still requires user validation.
-- For Ozon, list ozon.ru, ozone.ru and ozonusercontent.com as separate exclusions. Save and reconnect after updating.
+- The tray menu is narrower, with smaller Montserrat text and tighter spacing in both themes.
+- Windows tray menus open beside the right-click location, leaving the icon accessible, including in the hidden-icons popup. Resizing the profile menu keeps the same anchor and stays within the monitor work area.
+- The tray menu is hidden from the Windows taskbar. Left click still opens the main application; right click opens the menu.

@@ -168,10 +168,10 @@ func main() {
 	configureApplicationMenu(app, mainWindow)
 
 	trayWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name: "tray-menu", Title: "Sudoku — меню", Width: 250, Height: 220,
+		Name: "tray-menu", Title: "Sudoku — меню", Width: 220, Height: 196,
 		URL: "/?tray=1", Frameless: true, Hidden: true, AlwaysOnTop: true,
 		ContentProtectionEnabled: false, BackgroundColour: backgroundColour,
-		Windows: application.WindowsWindow{DisableFramelessWindowDecorations: false},
+		Windows: application.WindowsWindow{DisableFramelessWindowDecorations: false, HiddenOnTaskbar: true},
 	})
 	trayWindow.RegisterHook(events.Common.WindowClosing, func(event *application.WindowEvent) {
 		event.Cancel()
@@ -187,12 +187,30 @@ func main() {
 	} else {
 		tray.SetIcon(trayIcon)
 	}
+	var menuAnchor application.Point
+	var menuArea application.Rect
+	var anchored bool
+	positionTray := func() {
+		if anchored {
+			bounds := trayWindow.Bounds()
+			p := trayMenuPosition(menuAnchor, menuArea, bounds.Width, bounds.Height)
+			trayWindow.SetPosition(p.X, p.Y)
+		} else {
+			_ = tray.PositionWindow(trayWindow, 8)
+		}
+	}
+	trayWindow.OnWindowEvent(events.Common.WindowDidResize, func(_ *application.WindowEvent) {
+		if trayWindow.IsVisible() {
+			positionTray()
+		}
+	})
 	showTray := func() {
 		if trayWindow.IsVisible() {
 			trayWindow.Hide()
 			return
 		}
-		_ = tray.PositionWindow(trayWindow, 8)
+		menuAnchor, menuArea, anchored = trayAnchor()
+		positionTray()
 		trayWindow.Show().Focus()
 	}
 	tray.OnClick(func() {

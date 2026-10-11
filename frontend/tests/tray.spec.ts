@@ -5,7 +5,7 @@ const bindings = fs.readFileSync(path.resolve('bindings/github.com/SUDOKU-ASCII/
 const ids = Object.fromEntries([...bindings.matchAll(/export function (\w+)\([^]*?\$Call.ByID\((\d+)/g)].map(m => [Number(m[2]), m[1]]));
 
 test('tray follows theme, toggles connection, selects profiles and allows capture keys', async ({page}) => {
-  await page.setViewportSize({width: 250, height: 255});
+  await page.setViewportSize({width: 220, height: 255});
   const cfg = {ui: {theme: 'light'}, activeNodeId: 'one', nodes: [{id:'one',name:'Первый'}, {id:'two',name:'Второй'}]};
   const state = {running:false};
   const calls: string[] = [];
@@ -29,9 +29,9 @@ test('tray follows theme, toggles connection, selects profiles and allows captur
   });
   await page.goto('/?tray=1');
   await expect(page.getByText('Состояние: отключено')).toBeVisible();
-  await expect.poll(() => requestedHeight).toBeGreaterThan(180);
-  expect(requestedHeight).toBeLessThan(230);
-  await page.setViewportSize({width:250,height:requestedHeight});
+  await expect.poll(() => requestedHeight).toBeGreaterThan(160);
+  expect(requestedHeight).toBeLessThan(210);
+  await page.setViewportSize({width:220,height:requestedHeight});
   await page.getByRole('button', {name:'Подключить',exact:true}).click();
   await expect(page.getByText('Состояние: подключено')).toBeVisible();
   await page.getByRole('button', {name:'Отключить',exact:true}).click();

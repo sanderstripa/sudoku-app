@@ -34,8 +34,8 @@ function toggleConnection() { return action(() => state.value?.running ? api.sto
 function selectProfile(id: string) { return action(() => api.switchNode(id)); }
 onMounted(() => {
   observer = new ResizeObserver(() => {
-    const height = Math.ceil(panel.value?.getBoundingClientRect().height || 220);
-    if (height !== lastHeight) { lastHeight = height; void Window.SetSize(250, height).catch(() => {}); }
+    const height = Math.ceil(panel.value?.getBoundingClientRect().height || 196);
+    if (height !== lastHeight) { lastHeight = height; void Window.SetSize(220, height).catch(() => {}); }
   });
   if (panel.value) observer.observe(panel.value);
   void refresh(); timer = setInterval(refresh, 800); media.addEventListener('change', theme);
@@ -68,10 +68,10 @@ onBeforeUnmount(() => { observer?.disconnect(); clearInterval(timer); media.remo
 </template>
 
 <style scoped>
-.tray-panel { padding: 10px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; overflow: auto; font-size: 12px; }
-.tray-status { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 11px; height: 24px; }
+.tray-panel { padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; overflow: auto; font-size: 11px; }
+.tray-status { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 10px; height: 22px; }
 .tray-status button { padding: 3px; width: auto; }
-button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 6px; text-align: left; border-radius: 5px; min-height: 31px; }
+button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 7px 5px; text-align: left; border-radius: 5px; min-height: 28px; }
 button:hover { background: var(--hover); }
 button:focus-visible { outline: 1px solid var(--muted); }
 .tray-connect { font-weight: 600; }
