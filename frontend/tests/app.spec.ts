@@ -156,6 +156,7 @@ test("import, connection state, settings drafts, routing and themes", async ({
   await expect(page.getByRole("alert")).toContainText("Укажите домены");
   await page.getByLabel("Домены исключений").fill("hh.ru\navito.ru\nпример.рф");
   await page.getByRole("button", { name: "Сохранить настройки" }).click();
+  await expect(page.getByRole("status")).toHaveText("Настройки сохранены");
   expect(cfg.core.autoStart).toBe(true);
   expect(cfg.routing.customRules).toContain("DOMAIN-SUFFIX,hh.ru,DIRECT");
   expect(cfg.routing.ruleUrls).toEqual([]);
@@ -193,6 +194,8 @@ test("import, connection state, settings drafts, routing and themes", async ({
     await page.getByRole("button", { name: theme, exact: true }).click();
     await page.getByRole("combobox", { name: "Режим" }).click();
     await expect(page.getByRole("listbox")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Сохранить настройки" })).toHaveCSS("opacity", "1");
+    await expect.poll(() => page.getByRole("combobox", { name: "Режим" }).evaluate(e => getComputedStyle(e).backgroundColor === getComputedStyle(document.getElementById("routing-options")!).backgroundColor)).toBe(true);
     const colours = await page
       .getByRole("option")
       .first()
