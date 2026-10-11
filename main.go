@@ -195,7 +195,14 @@ func main() {
 		_ = tray.PositionWindow(trayWindow, 8)
 		trayWindow.Show().Focus()
 	}
-	tray.OnClick(showTray)
+	tray.OnClick(func() {
+		trayWindow.Hide()
+		if mainWindow.IsMinimised() {
+			mainWindow.UnMinimise()
+		}
+		mainWindow.Restore()
+		mainWindow.Show().Focus()
+	})
 	tray.OnRightClick(showTray)
 	app.Event.On("tray:open", func(event *application.CustomEvent) {
 		page, _ := event.Data.(string)

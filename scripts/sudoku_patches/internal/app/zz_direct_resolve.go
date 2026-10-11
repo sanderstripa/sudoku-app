@@ -84,6 +84,7 @@ func lookupDirectIPv4(ctx context.Context, server string, host string, timeout t
 		if err != nil {
 			continue
 		}
+		rememberDirectAddresses(host, ips)
 		for _, ip := range ips {
 			if usableDirectIPv4(ip) {
 				return ip.To4()

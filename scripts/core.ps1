@@ -276,6 +276,12 @@ if ($What -eq "all" -or $What -eq "sudoku") {
     # Patch dialTarget() to wrap conns for traffic stats (direct/proxy).
     Patch-GoDialTarget (Join-Path $sudokuDir "internal/app/client_target.go")
 
+    # Preserve domain exceptions for real IPs learned by DIRECT resolution.
+    $route = Join-Path $sudokuDir "internal/app/client_route.go"
+    Patch-ReplaceFirst $route 'if matched, match, directAddr := matchRuleManager(mgrs, routeActionDirect, destAddr, destIP); matched {' 'if matched, match := matchDirectAddress(mgrs, destAddr, destIP); matched {
+            return routeDecision{action: routeActionDirect, match: match, directAddr: destAddr}
+        }
+        if matched, match, directAddr := matchRuleManager(mgrs, routeActionDirect, destAddr, destIP); matched {'
     # Patch SOCKS5 UDP associate DIRECT path to avoid TUN self-loop for outbound UDP.
     $socks5 = Join-Path $sudokuDir "internal/app/client_socks5.go"
     $socksData = Read-Text $socks5
@@ -291,7 +297,7 @@ if ($What -eq "all" -or $What -eq "sudoku") {
       $env:GOOS = $goos
       $env:GOARCH = $goarch
       if ($goos -eq (& go env GOHOSTOS)) {
-        Invoke-Native "go" @("test", "-mod=mod", "-tags", "sudoku_patch", "./internal/app", "-run", "TestHTTPProxyPreservesPrefetchedTunnelBytes|TestHandleMixedConn_HTTP|TestExplicitExceptionsKeepChatGPTInVPN")
+        Invoke-Native "go" @("test", "-mod=mod", "-tags", "sudoku_patch", "./internal/app", "-run", "TestHTTPProxyPreservesPrefetchedTunnelBytes|TestHandleMixedConn_HTTP|TestExplicitExceptionsKeepChatGPTInVPN|TestDirectAddress")
       }
       Invoke-Native "go" @("build", "-mod=mod", "-tags", "sudoku_patch", "-trimpath", "-ldflags", "-s -w", "-o", $out, "./cmd/sudoku-tunnel")
     } finally {
@@ -303,4 +309,3 @@ if ($What -eq "all" -or $What -eq "sudoku") {
 }
 
 Write-Host "[ok] core binaries ready at $outDir"
-

@@ -1,6 +1,7 @@
-Windows 10/11 x64 · 0.1.8
+Windows 10/11 x64 · 0.1.9
 
-- Исправлены доменные исключения в режиме VPN для всего устройства: DNS сохраняет имя сайта до проверки правил маршрутизации.
-- Для пользовательского списка исключений больше не используется split DNS, который возвращал настоящий IP раньше выбора маршрута и обходил доменные правила.
-- Проверены hh.ru, ekaterinburg.hh.ru, ozon.ru и их поддомены как DIRECT; домены ChatGPT и авторизации остаются PROXY.
-- Проверки не изменяют системные маршруты и не проверяют пользовательскую сессию сайтов. После обновления переподключитесь и заново откройте вкладки с проблемными сайтами, чтобы не использовать старые соединения браузера.
+- Left-clicking the tray icon opens and focuses the application. Right-clicking opens the themed tray menu.
+- Domain exclusions now retain short-lived associations for real IPv4 addresses learned during direct DNS resolution. Later IP-only requests can reuse the matching domain exclusion.
+- Associations expire and are checked against active rules. Unrelated addresses remain proxied. Shared addresses may follow the associated excluded domain during this short interval.
+- Regression checks cover both resolved Ozon addresses, expiry, removed exceptions and unrelated IPs. These checks do not verify a signed-in Ozon browser session; website access still requires user validation.
+- For Ozon, list ozon.ru, ozone.ru and ozonusercontent.com as separate exclusions. Save and reconnect after updating.
