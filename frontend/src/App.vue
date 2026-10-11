@@ -516,9 +516,7 @@ onBeforeUnmount(() => {
       </div>
     </main>
     <footer>
-      <button @click="page = 'servers'">
-        <Link2 :size="13" />{{ config?.nodes.length || 0 }} соединений</button
-      ><span :role="message ? 'status' : undefined">{{
+      <span :role="message ? 'status' : undefined">{{
         message || "SUDOKU VPN"
       }}</span>
     </footer>
