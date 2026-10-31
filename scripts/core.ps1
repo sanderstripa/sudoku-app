@@ -267,7 +267,7 @@ if ($What -eq "all" -or $What -eq "sudoku") {
       $env:GOOS = $goos
       $env:GOARCH = $goarch
       if ($goos -eq (& go env GOHOSTOS)) {
-        Invoke-Native "go" @("test", "-mod=mod", "-tags", "sudoku_patch", "./internal/app", "-run", ".")
+        Invoke-Native "go" @("test", "-mod=mod", "-tags", "sudoku_patch", "./...")
       }
       Invoke-Native "go" @("build", "-mod=mod", "-tags", "sudoku_patch", "-trimpath", "-ldflags", "-s -w", "-o", $out, "./cmd/sudoku-tunnel")
     } finally {
