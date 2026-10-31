@@ -94,48 +94,6 @@ function Patch-ReplaceFirstN([string]$Path, [string]$Needle, [string]$Replacemen
   Write-Text $Path $new
 }
 
-function Patch-GoDialTarget([string]$Path) {
-  $data = Read-Text $Path
-  $needle = "func dialTarget("
-  $start = $data.IndexOf($needle)
-  if ($start -lt 0) { throw "dialTarget not found in $Path (upstream changed?)" }
-  $braceStart = $data.IndexOf("{", $start)
-  if ($braceStart -lt 0) { throw "dialTarget brace not found in $Path" }
-  $level = 0
-  $end = -1
-  for ($i = $braceStart; $i -lt $data.Length; $i++) {
-    $ch = $data[$i]
-    if ($ch -eq "{") {
-      $level++
-    } elseif ($ch -eq "}") {
-      $level--
-      if ($level -eq 0) {
-        $end = $i + 1
-        break
-      }
-    }
-  }
-  if ($end -lt 0) { throw "dialTarget end not found in $Path" }
-  $funcText = $data.Substring($start, $end - $start)
-  if ($funcText.Contains("wrapConnForTrafficStats")) { return }
-  $patched = $funcText
-  $replacements = @(
-    @{ Needle = "return conn, decision, true"; Replacement = "return wrapConnForTrafficStats(conn, true), decision, true" },
-    @{ Needle = "return dConn, decision, true"; Replacement = "return wrapConnForTrafficStats(dConn, false), decision, true" },
-    @{ Needle = "return conn, true"; Replacement = "return wrapConnForTrafficStats(conn, true), true" },
-    @{ Needle = "return dConn, true"; Replacement = "return wrapConnForTrafficStats(dConn, false), true" }
-  )
-  foreach ($entry in $replacements) {
-    $next = Replace-First $patched $entry.Needle $entry.Replacement
-    if ($null -ne $next) {
-      $patched = $next
-    }
-  }
-  if ($patched -eq $funcText) { throw "patch failed: dialTarget return pattern not found in $Path" }
-  $out = $data.Substring(0, $start) + $patched + $data.Substring($end)
-  Write-Text $Path $out
-}
-
 function Invoke-Native([string]$FilePath, [string[]]$ArgumentList) {
   & $FilePath @ArgumentList
   if ($LASTEXITCODE -ne 0) {
